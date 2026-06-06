@@ -1,27 +1,26 @@
-﻿# ── Python portable (no subir al repo) ───────────────────────
+# Python portable
 python/
 get-pip.py
 
-# ── Entornos y secretos ───────────────────────────────────────
+# Entornos y secretos
 .env
 .venv/
-# El .example SÍ se sube (es la plantilla sin datos reales)
 !.env.example
 *.pem
 *.key
 
-# ── Base de datos locales ─────────────────────────────────────
+# Base de datos locales
 *.db
 *.db-shm
 *.db-wal
 
-# ── Cache Python ──────────────────────────────────────────────
+# Cache Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
-# ── Build / instalador ────────────────────────────────────────
+# Build / instalador
 *.exe
 *.nsi
 *.spec
@@ -31,28 +30,28 @@ _build_tmp/
 create_installer.nsi
 create_instalador.nsi
 
-# ── Temporales ────────────────────────────────────────────────
+# Temporales
 *.tmp
 *.log
+*.lock
 
-# ── Herramientas y configuración local de desarrollo ──────────
+# Carpetas locales
 .agents/
-skills-lock.json
 .claude/
 
-# ── Scripts de migración ad-hoc ───────────────────────────────
+# Scripts de migracion puntuales
 web/migrar_*.py
 
-# ── IDE ───────────────────────────────────────────────────────
+# IDE
 .vscode/
 .idea/
 *.swp
 
-# ── Documentacion interna / privada ──────────────────────────
+# Documentacion interna
 web/DESPLIEGUE.md
 web/DESPLIEGUE_*.md
 
-# ── Archivos de proyecto propios (no son parte de la app web) ─
+# Archivos que no son parte de la app
 docs/
 installers/
 scripts/
@@ -62,8 +61,9 @@ SISDah*/
 SISDAS_HGUGM_PROYECTO/
 SISDah_HGUGM_PROYECTO/
 README_PRIVADO.md
+app/
 
-# ── Estáticos grandes ─────────────────────────────────────────
+# Estaticos grandes
 *.png
 *.ico
 web/static/SaludMadrid.png
