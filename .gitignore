@@ -30,22 +30,17 @@ _build_tmp/
 create_installer.nsi
 create_instalador.nsi
 
-# Temporales
+# Temporales y locks
 *.tmp
 *.log
 *.lock
 
-# Carpetas locales
-.agents/
-.claude/
-
-# Scripts de migracion puntuales
-web/migrar_*.py
-
-# IDE
+# IDE y herramientas
 .vscode/
 .idea/
 *.swp
+.agents/
+.claude/
 
 # Documentacion interna
 web/DESPLIEGUE.md
@@ -67,3 +62,6 @@ app/
 *.png
 *.ico
 web/static/SaludMadrid.png
+
+# Scripts de migracion puntuales
+web/migrar_*.py
