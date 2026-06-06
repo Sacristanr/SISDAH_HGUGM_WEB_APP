@@ -39,8 +39,7 @@ create_instalador.nsi
 .vscode/
 .idea/
 *.swp
-.agents/
-.claude/
+local/
 
 # Documentacion interna
 web/DESPLIEGUE.md
