@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Estadísticas{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-bar-chart-line icon-title"></i>Estadísticas del sistema</h4>
+  <a href="{{ url_for('exports.inventario_excel') }}" class="btn btn-outline-success btn-sm">
+    <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
+  </a>
+</div>
+
+<!-- KPIs -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-2"><div class="card stat-card blue text-center p-3"><div class="stat-num blue">{{ stats.total }}</div><div class="stat-lbl">Total</div></div></div>
+  <div class="col-6 col-md-2"><div class="card stat-card green text-center p-3"><div class="stat-num green">{{ stats.en_stock }}</div><div class="stat-lbl">En stock</div></div></div>
+  <div class="col-6 col-md-2"><div class="card stat-card orange text-center p-3"><div class="stat-num orange">{{ stats.retirados }}</div><div class="stat-lbl">Retirados</div></div></div>
+  <div class="col-6 col-md-2"><div class="card stat-card red text-center p-3"><div class="stat-num red">{{ stats.averia }}</div><div class="stat-lbl">Avería</div></div></div>
+  <div class="col-6 col-md-2"><div class="card stat-card gray text-center p-3"><div class="stat-num">{{ stats.usuarios }}</div><div class="stat-lbl">Usuarios</div></div></div>
+  <div class="col-6 col-md-2"><div class="card stat-card blue text-center p-3"><div class="stat-num blue">{{ stats.movimientos }}</div><div class="stat-lbl">Movimientos</div></div></div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- Gráfico por estado -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-pie-chart me-2 text-cm-red"></i>Estado del inventario</div>
+      <div class="card-body d-flex align-items-center justify-content-center">
+        <canvas id="chart-estado" style="max-height:220px"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gráfico por sección -->
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-bar-chart me-2 text-cm-red"></i>Equipos por sección</div>
+      <div class="card-body">
+        <canvas id="chart-seccion" style="max-height:220px"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Por marca -->
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-pc-display me-2 text-cm-red"></i>Top marcas</div>
+      <div class="table-responsive"><table class="table table-sm mb-0">
+        <tbody>
+          {% for marca, cnt in por_marca %}
+          <tr>
+            <td class="ps-3">{{ marca or 'Sin marca' }}</td>
+            <td class="text-end pe-3">
+              <div class="d-flex align-items-center gap-2 justify-content-end">
+                <div style="height:8px;background:var(--cm-red);border-radius:4px;width:{{ [cnt*80//(por_marca[0][1] or 1),4]|max }}px"></div>
+                <span class="fw-bold">{{ cnt }}</span>
+              </div>
+            </td>
+          </tr>
+          {% else %}<tr><td colspan="2" class="text-center text-muted py-3">Sin datos</td></tr>{% endfor %}
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- Top técnicos -->
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-person-check me-2 text-cm-red"></i>Más retiradas por técnico</div>
+      <div class="table-responsive"><table class="table table-sm mb-0">
+        <tbody>
+          {% for dni, cnt in por_tecnico %}
+          <tr>
+            <td class="ps-3 font-monospace small">{{ dni or '—' }}</td>
+            <td class="text-end pe-3"><span class="badge badge-estado-retirado">{{ cnt }}</span></td>
+          </tr>
+          {% else %}<tr><td colspan="2" class="text-center text-muted py-3">Sin datos</td></tr>{% endfor %}
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- Exportar -->
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-download me-2 text-cm-red"></i>Exportar datos</div>
+      <div class="card-body d-flex flex-column gap-2">
+        <a href="{{ url_for('exports.inventario_excel') }}" class="btn btn-outline-success">
+          <i class="bi bi-file-earmark-excel me-2"></i>Inventario completo (.xlsx)
+        </a>
+        <a href="{{ url_for('exports.inventario_excel') }}?estado=en+stock" class="btn btn-outline-secondary">
+          <i class="bi bi-file-earmark-excel me-2"></i>Solo en stock (.xlsx)
+        </a>
+        <a href="{{ url_for('exports.historial_excel') }}" class="btn btn-outline-secondary">
+          <i class="bi bi-file-earmark-excel me-2"></i>Historial movimientos (.xlsx)
+        </a>
+        {% if current_user.es_admin %}
+        <hr class="my-1">
+        <button class="btn btn-outline-cm-red" onclick="importarJSON()">
+          <i class="bi bi-arrow-repeat me-2"></i>Importar desde app escritorio
+        </button>
+        <div id="import-fb" class="small"></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Movimientos recientes -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-clock-history me-2 text-cm-red"></i>Últimos 50 movimientos (30 días)</div>
+      <div class="table-responsive" style="max-height:300px;overflow-y:auto">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="sticky-top-header"><tr><th class="ps-3">Fecha</th><th>ICM</th><th>Tipo</th><th>Usuario</th><th>Descripción</th></tr></thead>
+          <tbody>
+            {% for m in mov_recientes %}
+            <tr>
+              <td class="ps-3 small text-muted">{{ m.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+              <td class="font-monospace small">{% if m.icm in ('AUTH','ADMIN') %}<span class="text-muted fw-bold">{{ m.icm }}</span>{% else %}<a href="{{ url_for('inventario.detalle', icm=m.icm) }}" class="text-cm-red">{{ m.icm }}</a>{% endif %}</td>
+              <td>
+                {% if m.tipo=='entrada' %}<span class="badge badge-estado-stock">entrada</span>
+                {% elif m.tipo=='retirada' %}<span class="badge badge-estado-retirado">retirada</span>
+                {% else %}<span class="badge bg-light text-dark border">{{ m.tipo }}</span>{% endif %}
+              </td>
+              <td class="small">{{ m.usuario_dni or '—' }}</td>
+              <td class="small text-muted">{{ m.descripcion or '—' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-3">Sin movimientos en los últimos 30 días</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// Gráfico de estado (dona)
+const ctxEstado = document.getElementById('chart-estado').getContext('2d');
+new Chart(ctxEstado, {
+  type: 'doughnut',
+  data: {
+    labels: ['En stock','Retirados','Avería','Reservados','Papelera'],
+    datasets: [{
+      data: [{{ stats.en_stock }},{{ stats.retirados }},{{ stats.averia }},{{ stats.reservados }},{{ stats.papelera }}],
+      backgroundColor: ['#198754','#D4A000','#C8102E','#0077B6','#6C757D'],
+      borderWidth: 2,
+      borderColor: '#fff'
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position:'bottom', labels:{font:{size:11}} } }
+  }
+});
+
+// Gráfico por sección (barras)
+const ctxSec = document.getElementById('chart-seccion').getContext('2d');
+new Chart(ctxSec, {
+  type: 'bar',
+  data: {
+    labels: {{ por_seccion | map(attribute=0) | list | tojson }},
+    datasets: [{
+      label: 'Equipos',
+      data:  {{ por_seccion | map(attribute=1) | list | tojson }},
+      backgroundColor: '#C8102E',
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display:false } },
+    scales: { y: { beginAtZero:true, ticks:{stepSize:1} }, x:{ticks:{font:{size:11}}} }
+  }
+});
+
+{% if current_user.es_admin %}
+async function importarJSON() {
+  const fb = document.getElementById('import-fb');
+  fb.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Importando…';
+  const r = await _fetch('/exportar/importar_json', {method:'POST'});
+  const d = await r.json();
+  if (d.ok) {
+    toast(`✓ Importados: ${d.insertados} · Duplicados: ${d.duplicados} · Errores: ${d.errores}`);
+    fb.innerHTML = `<span class="text-success">✓ ${d.insertados} equipos importados, ${d.duplicados} ya existían</span>`;
+    setTimeout(()=>location.reload(), 2000);
+  } else {
+    toast('Error: '+d.error,'danger',6000);
+    fb.innerHTML = `<span class="text-danger">${d.error}</span>`;
+  }
+}
+{% endif %}
+</script>
+{% endblock %}

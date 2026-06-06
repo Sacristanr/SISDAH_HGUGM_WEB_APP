@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 110" shape-rendering="geometricPrecision">
+  <!-- Parte izquierda: Cruz sanitaria azul -->
+  <rect x="0" y="0" width="108" height="110" rx="6" fill="#0095D9"/>
+  <!-- Cruz / estrella sanitaria blanca (forma angular estilo CM Salud) -->
+  <polygon points="
+    54,8
+    68,30  88,18  76,40
+    100,42  82,56
+    88,78  66,68
+    54,90  42,68
+    20,78  26,56
+    8,42   32,40
+    20,18  40,30
+  " fill="white"/>
+
+  <!-- Parte derecha: Cuadrado rojo con 7 estrellas CM -->
+  <rect x="112" y="0" width="108" height="110" rx="6" fill="#C8102E"/>
+  <!-- 7 estrellas blancas — patrón Osa Mayor Comunidad de Madrid -->
+  <!-- Fila superior: 3 estrellas -->
+  <text x="145" y="42" font-size="22" fill="white" text-anchor="middle">★</text>
+  <text x="166" y="42" font-size="22" fill="white" text-anchor="middle">★</text>
+  <text x="187" y="42" font-size="22" fill="white" text-anchor="middle">★</text>
+  <!-- Fila media: 2 estrellas -->
+  <text x="152" y="66" font-size="22" fill="white" text-anchor="middle">★</text>
+  <text x="178" y="66" font-size="22" fill="white" text-anchor="middle">★</text>
+  <!-- Fila inferior: 2 estrellas -->
+  <text x="152" y="90" font-size="22" fill="white" text-anchor="middle">★</text>
+  <text x="178" y="90" font-size="22" fill="white" text-anchor="middle">★</text>
+</svg>

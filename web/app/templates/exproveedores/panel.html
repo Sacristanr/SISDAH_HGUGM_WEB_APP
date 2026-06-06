@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}Exproveedores{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-building-x icon-title"></i>Exproveedores</h4>
+  <small class="text-muted">Marcas y modelos que ya no usamos</small>
+</div>
+
+<div class="row g-4">
+  <!-- Agregar -->
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-plus-circle me-2 text-cm-red"></i>Agregar exproveedor</div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          Marca una marca o modelo como retirado del catalogo activo.
+          Dejara de aparecer al registrar nuevo material.
+        </p>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Seccion</label>
+          <select id="new-sec" class="form-select" onchange="onSecChange()">
+            <option value="">— Selecciona seccion —</option>
+            {% for s in secciones %}
+            <option value="{{ s }}">{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Marca <span class="text-cm-red">*</span></label>
+          <select id="new-marca" class="form-select" onchange="onMarcaChange()" disabled>
+            <option value="">— Elige seccion primero —</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Modelo
+            <span class="text-muted small">(opcional — vacio = toda la marca)</span>
+          </label>
+          <select id="new-modelo" class="form-select" disabled>
+            <option value="">— Toda la marca —</option>
+          </select>
+        </div>
+
+        <div id="preview-sel" class="alert py-2 mb-3 d-none" style="background:#FFF8E1;color:#795548;border:1px solid #FFE082">
+          <i class="bi bi-building-x me-1"></i>
+          Marcar como exproveedor: <strong id="preview-txt"></strong>
+        </div>
+
+        <button class="btn btn-outline-danger w-100 fw-semibold" onclick="agregar()">
+          <i class="bi bi-building-x me-2"></i>Marcar como exproveedor
+        </button>
+        <div id="add-fb" class="mt-2 small"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lista -->
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-ul me-2 text-cm-red"></i>Exproveedores registrados</span>
+        <span class="badge bg-cm-red">{{ exproveedores|length }}</span>
+      </div>
+
+      {% if exproveedores %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead>
+            <tr>
+              <th class="ps-3">Seccion</th><th>Marca</th><th>Modelo</th>
+              <th>Alcance</th><th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in exproveedores %}
+            <tr>
+              <td class="ps-3">
+                <span class="badge bg-light text-dark border">{{ e.seccion or 'Todas' }}</span>
+              </td>
+              <td class="fw-semibold">{{ e.marca }}</td>
+              <td class="text-muted small">{{ e.modelo or '—' }}</td>
+              <td>
+                {% if e.modelo %}
+                <span class="badge" style="background:#FFF8E1;color:#795548">Solo este modelo</span>
+                {% else %}
+                <span class="badge badge-estado-averia">Toda la marca</span>
+                {% endif %}
+              </td>
+              <td>
+                <button class="btn btn-outline-success btn-sm py-0"
+                        onclick="restaurar('{{ e.marca }}', {{ e.modelo|tojson }})"
+                        title="Restaurar al catalogo activo">
+                  <i class="bi bi-plus-circle me-1"></i>Restaurar
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-center text-muted py-4">
+        <i class="bi bi-building-check fs-2 d-block mb-2 text-success"></i>
+        Sin exproveedores registrados
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="alert border py-2 small mt-3" style="background:#F8F9FA">
+      <i class="bi bi-info-circle me-1"></i>
+      Los exproveedores no eliminan el inventario ya registrado. Solo se ocultan en el catalogo
+      al registrar nuevos equipos. En las fichas de equipos existentes apareceran marcados con
+      <span class="badge badge-estado-averia ms-1">exproveedor</span>.
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CATALOGO = {{ catalogo_json|safe }};
+
+async function onSecChange() {
+  const sec  = document.getElementById('new-sec').value;
+  const selM = document.getElementById('new-marca');
+  const selMod = document.getElementById('new-modelo');
+
+  selM.disabled   = true;
+  selMod.disabled = true;
+  selM.innerHTML   = '<option value="">— Cargando... —</option>';
+  selMod.innerHTML = '<option value="">— Toda la marca —</option>';
+  actualizarPreview();
+
+  if (!sec) {
+    selM.innerHTML = '<option value="">— Elige seccion primero —</option>';
+    return;
+  }
+
+  const marcas = Object.keys(CATALOGO[sec] || {}).sort();
+  selM.innerHTML = '<option value="">— Selecciona marca —</option>' +
+    marcas.map(m => `<option value="${m}">${m}</option>`).join('');
+  selM.disabled = false;
+}
+
+function onMarcaChange() {
+  const sec    = document.getElementById('new-sec').value;
+  const marca  = document.getElementById('new-marca').value;
+  const selMod = document.getElementById('new-modelo');
+
+  selMod.disabled = true;
+  selMod.innerHTML = '<option value="">— Toda la marca —</option>';
+  actualizarPreview();
+
+  if (!marca) return;
+
+  const modelos = (CATALOGO[sec] && CATALOGO[sec][marca]) ? CATALOGO[sec][marca] : [];
+  selMod.innerHTML = '<option value="">— Toda la marca —</option>' +
+    modelos.map(m => `<option value="${m}">${m}</option>`).join('');
+  selMod.disabled = false;
+  selMod.onchange = actualizarPreview;
+}
+
+function actualizarPreview() {
+  const marca  = document.getElementById('new-marca').value;
+  const modelo = document.getElementById('new-modelo').value;
+  const div    = document.getElementById('preview-sel');
+  const txt    = document.getElementById('preview-txt');
+  if (marca) {
+    div.classList.remove('d-none');
+    txt.textContent = marca + (modelo ? ' — ' + modelo : ' (toda la marca)');
+  } else {
+    div.classList.add('d-none');
+  }
+}
+
+async function agregar() {
+  const seccion = document.getElementById('new-sec').value;
+  const marca   = document.getElementById('new-marca').value;
+  const modelo  = document.getElementById('new-modelo').value;
+  const fb      = document.getElementById('add-fb');
+
+  if (!marca) { toast('Selecciona una marca', 'warning'); return; }
+
+  const r = await _fetch('/exproveedores/agregar', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({seccion, marca, modelo})
+  });
+  const d = await r.json();
+
+  if (d.ok) {
+    toast('Exproveedor registrado: ' + marca + (modelo ? ' - ' + modelo : ''), 'warning', 3000);
+    setTimeout(() => location.reload(), 800);
+  } else {
+    fb.innerHTML = `<span class="text-danger">${d.error}</span>`;
+  }
+}
+
+async function restaurar(marca, modelo) {
+  if (!await sisdahConfirm('Restaurar ' + marca + (modelo ? ' — ' + modelo : '') + ' al catálogo activo.', {title:'Restaurar al catálogo', btnText:'Restaurar', danger:false, btnClass:'btn-success', icon:'bi-arrow-counterclockwise'})) return;
+  const r = await _fetch('/exproveedores/eliminar', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({marca, modelo})
+  });
+  const d = await r.json();
+  if (d.ok) {
+    toast(marca + ' restaurado al catalogo', 'success');
+    setTimeout(() => location.reload(), 800);
+  }
+}
+</script>
+{% endblock %}

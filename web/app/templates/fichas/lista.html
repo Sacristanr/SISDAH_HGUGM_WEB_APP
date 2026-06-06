@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Fichas técnicas{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-card-list icon-title"></i>Fichas técnicas</h4>
+  {% if current_user.es_gestor %}
+  <button class="btn btn-cm-red btn-sm" onclick="abrirModal()">
+    <i class="bi bi-plus-circle me-1"></i>Nueva ficha
+  </button>
+  {% endif %}
+</div>
+
+<!-- Filtros -->
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="GET" class="row g-2">
+      <div class="col-md-3">
+        <select name="seccion" class="form-select" onchange="this.form.submit()">
+          <option value="">Todas las secciones</option>
+          {% for s in secciones %}
+          <option value="{{ s }}" {% if seccion==s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Buscar marca o modelo…">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-cm-red"><i class="bi bi-search"></i></button>
+        <a href="{{ url_for('fichas.lista') }}" class="btn btn-outline-secondary">Limpiar</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if fichas %}
+<div class="row g-3">
+  {% for f in fichas %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100 ficha-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+          <span class="badge bg-light text-dark border me-1">{{ f.seccion or '—' }}</span>
+          <strong>{{ f.marca or '' }} {{ f.modelo }}</strong>
+        </div>
+        {% if current_user.es_gestor %}
+        <div class="d-flex gap-1">
+          <button class="btn btn-outline-secondary btn-sm py-0" onclick='editarFicha({{ f.to_dict()|tojson }})'><i class="bi bi-pencil"></i></button>
+          {% if current_user.es_admin %}
+          <button class="btn btn-outline-danger btn-sm py-0" onclick="eliminarFicha({{ f.id }})"><i class="bi bi-trash"></i></button>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          {% if f.procesador %}<tr><th class="ps-3 text-muted" style="width:40%">Procesador</th><td>{{ f.procesador }}</td></tr>{% endif %}
+          {% if f.ram %}<tr><th class="ps-3 text-muted">RAM</th><td>{{ f.ram }}</td></tr>{% endif %}
+          {% if f.almacenamiento %}<tr><th class="ps-3 text-muted">Almacenamiento</th><td>{{ f.almacenamiento }}</td></tr>{% endif %}
+          {% if f.pantalla %}<tr><th class="ps-3 text-muted">Pantalla</th><td>{{ f.pantalla }}</td></tr>{% endif %}
+          {% if f.so %}<tr><th class="ps-3 text-muted">Sistema op.</th><td>{{ f.so }}</td></tr>{% endif %}
+          {% if f.bios_version %}<tr><th class="ps-3 text-muted">BIOS</th><td class="font-monospace small">{{ f.bios_version }}</td></tr>{% endif %}
+          {% if current_user.es_gestor %}
+            {% if f.bios_pass %}<tr><th class="ps-3 text-muted">Pass BIOS</th><td class="font-monospace small">
+              <span class="pass-hidden" data-pass="{{ f.bios_pass }}">••••••••</span>
+              <button class="btn btn-link btn-sm py-0 px-1" onclick="togglePass(this)"><i class="bi bi-eye"></i></button>
+            </td></tr>{% endif %}
+            {% if f.admin_user %}<tr><th class="ps-3 text-muted">Usuario admin</th><td class="font-monospace small">{{ f.admin_user }}</td></tr>{% endif %}
+            {% if f.admin_pass %}<tr><th class="ps-3 text-muted">Pass admin</th><td class="font-monospace small">
+              <span class="pass-hidden" data-pass="{{ f.admin_pass }}">••••••••</span>
+              <button class="btn btn-link btn-sm py-0 px-1" onclick="togglePass(this)"><i class="bi bi-eye"></i></button>
+            </td></tr>{% endif %}
+          {% endif %}
+        </table>
+        {% if f.notas %}
+        <div class="px-3 py-2 border-top">
+          <small class="text-muted">{{ f.notas }}</small>
+        </div>
+        {% endif %}
+      </div>
+      <div class="card-footer py-1 d-flex gap-2">
+        {% if f.drivers_url %}
+        <a href="{{ f.drivers_url }}" target="_blank" class="btn btn-outline-secondary btn-sm py-0">
+          <i class="bi bi-download me-1"></i>Drivers
+        </a>
+        {% endif %}
+        {% if f.manual_url %}
+        <a href="{{ f.manual_url }}" target="_blank" class="btn btn-outline-secondary btn-sm py-0">
+          <i class="bi bi-file-pdf me-1"></i>Manual
+        </a>
+        {% endif %}
+        <small class="text-muted ms-auto align-self-center">{{ f.actualizado or '' }}</small>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-light border text-center py-5">
+  <i class="bi bi-card-list fs-1 text-muted d-block mb-2"></i>
+  <strong>Sin fichas técnicas</strong>
+  <p class="text-muted mb-0 small">Crea fichas para guardar configuraciones, contraseñas y drivers por modelo</p>
+</div>
+{% endif %}
+
+<!-- Modal -->
+{% if current_user.es_gestor %}
+<div class="modal fade" id="modalFicha" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold">Ficha técnica</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="f-id">
+        <div class="row g-3">
+          <div class="col-md-4"><label class="form-label">Sección</label>
+            <select id="f-sec" class="form-select">
+              <option value="">—</option>
+              {% for s in ['PORTÁTILES','SOBREMESA','IMPRESORAS','PERIFÉRICOS','SERVIDORES','MONITORES'] %}
+              <option>{{ s }}</option>{% endfor %}
+            </select></div>
+          <div class="col-md-4"><label class="form-label">Marca</label>
+            <input id="f-marca" class="form-control" placeholder="LENOVO, HP…"></div>
+          <div class="col-md-4"><label class="form-label">Modelo *</label>
+            <input id="f-modelo" class="form-control" placeholder="ThinkPad L14 Gen2"></div>
+          <div class="col-md-6"><label class="form-label">Procesador</label>
+            <input id="f-proc" class="form-control" placeholder="Intel Core i5-1135G7"></div>
+          <div class="col-md-3"><label class="form-label">RAM</label>
+            <input id="f-ram" class="form-control" placeholder="8 GB DDR4"></div>
+          <div class="col-md-3"><label class="form-label">Almacenamiento</label>
+            <input id="f-disk" class="form-control" placeholder="256 GB SSD"></div>
+          <div class="col-md-4"><label class="form-label">Pantalla</label>
+            <input id="f-pan" class="form-control" placeholder="14&quot; FHD IPS"></div>
+          <div class="col-md-4"><label class="form-label">Sistema operativo</label>
+            <input id="f-so" class="form-control" placeholder="Windows 10 Pro"></div>
+          <div class="col-md-4"><label class="form-label">Versión BIOS</label>
+            <input id="f-bios" class="form-control font-monospace"></div>
+          <div class="col-md-6"><label class="form-label"><i class="bi bi-lock me-1 text-cm-red"></i>Contraseña BIOS</label>
+            <input id="f-bpass" class="form-control font-monospace" type="password"></div>
+          <div class="col-md-3"><label class="form-label"><i class="bi bi-person me-1 text-cm-red"></i>Usuario admin</label>
+            <input id="f-auser" class="form-control font-monospace"></div>
+          <div class="col-md-3"><label class="form-label"><i class="bi bi-lock me-1 text-cm-red"></i>Contraseña admin</label>
+            <input id="f-apass" class="form-control font-monospace" type="password"></div>
+          <div class="col-12"><label class="form-label">URL Drivers</label>
+            <input id="f-drv" class="form-control" placeholder="https://support.lenovo.com/…"></div>
+          <div class="col-12"><label class="form-label">URL Manual</label>
+            <input id="f-man" class="form-control" placeholder="https://…"></div>
+          <div class="col-12"><label class="form-label">Notas</label>
+            <textarea id="f-not" class="form-control" rows="3"></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-cm-red" onclick="guardarFicha()"><i class="bi bi-check-circle me-1"></i>Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function togglePass(btn) {
+  const span = btn.previousElementSibling;
+  if (span.textContent === '••••••••') {
+    span.textContent = span.dataset.pass;
+    btn.querySelector('i').className = 'bi bi-eye-slash';
+  } else {
+    span.textContent = '••••••••';
+    btn.querySelector('i').className = 'bi bi-eye';
+  }
+}
+
+{% if current_user.es_gestor %}
+const modal = new bootstrap.Modal(document.getElementById('modalFicha'));
+const FIELDS = {id:'f-id',seccion:'f-sec',marca:'f-marca',modelo:'f-modelo',
+  procesador:'f-proc',ram:'f-ram',almacenamiento:'f-disk',pantalla:'f-pan',
+  so:'f-so',bios_version:'f-bios',bios_pass:'f-bpass',admin_user:'f-auser',
+  admin_pass:'f-apass',drivers_url:'f-drv',manual_url:'f-man',notas:'f-not'};
+
+function abrirModal() {
+  Object.values(FIELDS).forEach(id => document.getElementById(id).value='');
+  modal.show();
+}
+function editarFicha(f) {
+  Object.entries(FIELDS).forEach(([key, id]) => document.getElementById(id).value = f[key]||'');
+  modal.show();
+}
+async function guardarFicha() {
+  const data = {};
+  Object.entries(FIELDS).forEach(([key, id]) => data[key] = document.getElementById(id).value);
+  const r = await _fetch('/fichas/guardar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  });
+  const d = await r.json();
+  if(d.ok){ modal.hide(); toast('Ficha guardada'); setTimeout(()=>location.reload(),800); }
+  else toast('Error: '+d.error,'danger');
+}
+async function eliminarFicha(id) {
+  if(!await sisdahConfirm('¿Eliminar esta ficha técnica? No se puede deshacer.', {title:'Eliminar ficha', btnText:'Eliminar'})) return;
+  const r = await _fetch(`/fichas/eliminar/${id}`,{method:'POST'});
+  const d = await r.json();
+  if(d.ok){ toast('Ficha eliminada','warning'); setTimeout(()=>location.reload(),800); }
+}
+{% endif %}
+</script>
+{% endblock %}

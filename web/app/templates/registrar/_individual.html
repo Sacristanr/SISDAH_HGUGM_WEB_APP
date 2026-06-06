@@ -1,0 +1,97 @@
+<!-- ══ MODO INDIVIDUAL ══════════════════════════════════════════ -->
+<div id="panel-individual" class="d-none">
+  <div class="card">
+    <div class="card-header red-header">
+      <i class="bi bi-pencil-square me-2"></i>Registro individual — todos los campos
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-12"><p class="section-label">Identificación del equipo</p></div>
+        <div class="col-md-3">
+          <label class="form-label">ICM <span class="text-cm-red">*</span></label>
+          <input type="text" id="ind-icm" class="form-control font-monospace text-center"
+                 placeholder="ICM-0001" autocomplete="off">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">N.º Serie (S/N)</label>
+          <input type="text" id="ind-sn" class="form-control font-monospace"
+                 placeholder="SN123456" autocomplete="off">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Sección <span class="text-cm-red">*</span></label>
+          <select id="ind-seccion" class="form-select" onchange="indCargarMarcas()">
+            <option value="">— Selecciona —</option>
+            {% for s in secciones %}
+            <option value="{{ s }}">{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Estado</label>
+          <select id="ind-estado" class="form-select">
+            <option value="en stock">En stock</option>
+            <option value="averia">Avería</option>
+            <option value="reservado">Reservado</option>
+            <option value="reacondicionado">Reacondicionado</option>
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Marca <span class="text-cm-red">*</span></label>
+          <select id="ind-marca" class="form-select" onchange="indCargarModelos()" disabled>
+            <option value="">— Elige sección primero —</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Modelo <span class="text-cm-red">*</span></label>
+          <select id="ind-modelo" class="form-select" disabled>
+            <option value="">— Elige marca primero —</option>
+          </select>
+          <div id="ind-modelo-libre-grupo" class="mt-1 d-none">
+            <input type="text" id="ind-modelo-libre" class="form-control"
+                   placeholder="Escribe el modelo…">
+          </div>
+          <div class="form-check mt-1">
+            <input class="form-check-input" type="checkbox" id="ind-chk-modelo-libre"
+                   onchange="indToggleModeloLibre()">
+            <label class="form-check-label text-muted small" for="ind-chk-modelo-libre">
+              Modelo no en catálogo
+            </label>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">N.º Pedido</label>
+          <input type="text" id="ind-pedido" class="form-control" placeholder="PED-2026-001">
+        </div>
+
+        <div class="col-12"><p class="section-label">Información adicional</p></div>
+        <div class="col-md-4">
+          <label class="form-label">Ubicación</label>
+          <input type="text" id="ind-ubicacion" class="form-control" placeholder="Planta 2, Sala A">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Garantía fin</label>
+          <input type="date" id="ind-garantia" class="form-control">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Ticket</label>
+          <input type="text" id="ind-ticket" class="form-control" placeholder="INC-12345">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Notas</label>
+          <textarea id="ind-notas" class="form-control" rows="2"
+                    placeholder="Observaciones, accesorios incluidos…"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer d-flex justify-content-end gap-2">
+      <div id="ind-feedback" class="me-auto align-self-center small"></div>
+      <button class="btn btn-outline-secondary" onclick="setModoGlobal('lote')">
+        <i class="bi bi-x me-1"></i>Cancelar
+      </button>
+      <button class="btn btn-cm-red" onclick="guardarIndividual()">
+        <i class="bi bi-check-circle me-1"></i>Guardar equipo
+      </button>
+    </div>
+  </div>
+</div>

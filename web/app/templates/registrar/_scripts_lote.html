@@ -1,0 +1,424 @@
+<script>
+// ═══════════════════════════════════════════════════════════════
+// SCRIPTS MODO LOTE — cascada, escáner, cámara, TEM
+// ═══════════════════════════════════════════════════════════════
+
+// ── Cámara: solo en móvil/tablet (touch + pantalla pequeña) ───
+(function() {
+  const esMovil = navigator.maxTouchPoints > 0 &&
+                  window.matchMedia('(max-width: 1024px)').matches;
+  if (!esMovil) {
+    const btn = document.getElementById('btn-modo-camara');
+    if (btn) btn.remove();
+  }
+})();
+
+let usandoSN  = false;
+let timerICM  = null;
+let timerSN   = null;
+let bloqueado = false;
+const BLOQUEO = 300;
+
+const inpICM = document.getElementById('inp-icm');
+const inpSN  = document.getElementById('inp-sn');
+
+// ── Modo teléfono: activa/desactiva el panel especial ─────────
+function esTelefonos() {
+  return document.getElementById('sel-seccion').value === 'TELÉFONOS';
+}
+
+function aplicarModoTelefono(activar) {
+  // Panel central: swap entre scanner normal y formulario teléfono
+  document.getElementById('panel-tel-entrada').classList.toggle('d-none', !activar);
+  document.getElementById('panel-manual').classList.toggle('d-none', activar);
+  document.getElementById('panel-camara').classList.toggle('d-none', true); // siempre ocultar cámara en modo tel
+  document.getElementById('toggle-modo').classList.toggle('d-none', activar);
+  document.getElementById('paso2-titulo').textContent = activar ? 'Datos del teléfono' : 'Añadir equipos';
+
+  // Panel 1: ocultar TEM y S/N switch (no aplican a teléfonos)
+  document.getElementById('chk-sn').closest('.form-check').classList.toggle('d-none', activar);
+  document.querySelector('.alert[style*="FFF8E1"]')?.classList.toggle('d-none', activar);
+
+  if (activar) {
+    // Limpiar campos de teléfono al activar
+    ['tel-lote-ns','tel-lote-mac','tel-lote-ip','tel-lote-ubi'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    setTimeout(() => document.getElementById('tel-lote-ns').focus(), 100);
+  } else {
+    setTimeout(() => document.getElementById('inp-icm').focus(), 100);
+  }
+}
+
+// ── Cascada sección → marca → modelo ─────────────────────────
+async function cargarMarcas() {
+  const sec       = document.getElementById('sel-seccion').value;
+  const selMarca  = document.getElementById('sel-marca');
+  const selModelo = document.getElementById('sel-modelo');
+
+  selMarca.disabled  = true;
+  selModelo.disabled = true;
+  selMarca.innerHTML  = '<option value="">Cargando…</option>';
+  selModelo.innerHTML = '<option value="">— Elige marca primero —</option>';
+  actualizarResumen();
+
+  // ── Modo teléfono especial ──────────────────────────────────
+  aplicarModoTelefono(sec === 'TELÉFONOS');
+
+  if (!sec) {
+    selMarca.innerHTML = '<option value="">— Elige sección primero —</option>';
+    return;
+  }
+  const r = await _fetch('/registrar/api/marcas?seccion=' + encodeURIComponent(sec));
+  const marcas = await r.json();
+  selMarca.innerHTML = '<option value="">— Selecciona marca —</option>';
+  marcas.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = opt.textContent = m;
+    selMarca.appendChild(opt);
+  });
+  selMarca.disabled = false;
+  actualizarResumen();
+}
+
+// ── Helpers modo teléfono ──────────────────────────────────────
+function telLoteFormatMAC(inp) {
+  let v = inp.value.toUpperCase().replace(/[^A-F0-9]/g, '');
+  let f = v.match(/.{1,2}/g)?.join(':') || v;
+  if (f.length > 17) f = f.slice(0, 17);
+  inp.value = f;
+}
+
+function telLoteAnadir() {
+  const modelo = getModeloSeleccionado();
+  const ns     = document.getElementById('tel-lote-ns').value.trim();
+  const mac    = document.getElementById('tel-lote-mac').value.trim();
+  const ip     = document.getElementById('tel-lote-ip').value.trim();
+  const ubi    = document.getElementById('tel-lote-ubi').value.trim();
+
+  if (!modelo) { toast('Selecciona un modelo en el paso 1', 'warning'); return; }
+  if (!ns && !mac) { toast('Introduce al menos NS o MAC', 'warning'); document.getElementById('tel-lote-ns').focus(); return; }
+
+  // Añadir a la lista de pendientes como objeto teléfono
+  const item = { _tipo: 'telefono', modelo, ns, mac, ip, ubicacion_libre: ubi,
+                 label: modelo + (ns ? ' · ' + ns : '') + (mac ? ' · ' + mac : '') };
+  pendientes.push(item);
+  actualizarLista();
+
+  // Limpiar campos para el siguiente
+  ['tel-lote-ns','tel-lote-mac','tel-lote-ip','tel-lote-ubi'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('tel-lote-ns').focus();
+}
+
+async function cargarModelos() {
+  const sec       = document.getElementById('sel-seccion').value;
+  const marca     = document.getElementById('sel-marca').value;
+  const selModelo = document.getElementById('sel-modelo');
+
+  selModelo.disabled = true;
+  selModelo.innerHTML = '<option value="">Cargando…</option>';
+  actualizarResumen();
+
+  if (!marca) {
+    selModelo.innerHTML = '<option value="">— Elige marca primero —</option>';
+    return;
+  }
+  const r = await _fetch('/registrar/api/modelos?seccion=' + encodeURIComponent(sec)
+                        + '&marca=' + encodeURIComponent(marca));
+  const modelos = await r.json();
+  selModelo.innerHTML = '<option value="">— Selecciona modelo —</option>';
+  modelos.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = opt.textContent = m;
+    selModelo.appendChild(opt);
+  });
+  selModelo.disabled = false;
+  selModelo.onchange = actualizarResumen;
+  actualizarResumen();
+}
+
+function toggleModeloLibre() {
+  const libre = document.getElementById('chk-modelo-libre').checked;
+  document.getElementById('modelo-libre-grupo').classList.toggle('d-none', !libre);
+  document.getElementById('sel-modelo').disabled = libre;
+  if (!libre) document.getElementById('inp-modelo-libre').value = '';
+}
+
+function getModeloSeleccionado() {
+  if (document.getElementById('chk-modelo-libre').checked)
+    return document.getElementById('inp-modelo-libre').value.trim().toUpperCase();
+  return document.getElementById('sel-modelo').value;
+}
+
+function actualizarResumen() {
+  const sec    = document.getElementById('sel-seccion').value;
+  const marca  = document.getElementById('sel-marca').value;
+  const modelo = getModeloSeleccionado();
+  const div    = document.getElementById('resumen-config');
+  const txt    = document.getElementById('resumen-texto');
+  if (sec && marca && modelo) {
+    div.classList.remove('d-none');
+    txt.textContent = sec + ' · ' + marca + ' ' + modelo;
+  } else {
+    div.classList.add('d-none');
+  }
+}
+
+// ── Switch S/N ────────────────────────────────────────────────
+document.getElementById('chk-sn').addEventListener('change', e => {
+  usandoSN = e.target.checked;
+  document.getElementById('sn-group').classList.toggle('d-none', !usandoSN);
+  inpICM.focus();
+});
+
+// ── Detección pistola vs teclado (burst) ──────────────────────
+let _icmBurstCount = 0, _icmLastTime = 0;
+
+inpICM.addEventListener('input', () => {
+  if (bloqueado) { inpICM.value = ''; return; }
+  clearTimeout(timerICM);
+  if (!inpICM.value.trim()) { _icmBurstCount = 0; return; }
+
+  const now = Date.now();
+  _icmBurstCount = (now - _icmLastTime < 60) ? _icmBurstCount + 1 : 1;
+  _icmLastTime   = now;
+
+  if (_icmBurstCount >= 4) {
+    timerICM = setTimeout(() => {
+      _icmBurstCount = 0;
+      if (usandoSN) { inpSN.value = ''; inpSN.focus(); }
+      else registrarICM();
+    }, 80);
+  }
+});
+
+let _snBurstCount = 0, _snLastTime = 0;
+
+inpSN.addEventListener('input', () => {
+  if (bloqueado) { inpSN.value = ''; return; }
+  clearTimeout(timerSN);
+  if (!inpSN.value.trim()) { _snBurstCount = 0; return; }
+
+  const now = Date.now();
+  _snBurstCount = (now - _snLastTime < 60) ? _snBurstCount + 1 : 1;
+  _snLastTime   = now;
+
+  if (_snBurstCount >= 4) {
+    timerSN = setTimeout(() => { _snBurstCount = 0; registrarICM(); }, 80);
+  }
+});
+
+inpICM.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault(); clearTimeout(timerICM);
+  if (usandoSN && inpICM.value.trim()) { inpSN.value = ''; inpSN.focus(); }
+  else registrarICM();
+});
+inpSN.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault(); clearTimeout(timerSN); registrarICM();
+});
+
+function getUbicacion() {
+  return document.getElementById('inp-ubicacion')?.value.trim() || '';
+}
+
+function registrarICM() {
+  const sec    = document.getElementById('sel-seccion').value;
+  const marca  = document.getElementById('sel-marca').value;
+  const modelo = getModeloSeleccionado();
+  const fb     = document.getElementById('icm-feedback');
+
+  if (!sec || !marca || !modelo) {
+    fb.className = 'form-text text-danger mt-1';
+    fb.textContent = '⚠ Completa sección, marca y modelo primero';
+    document.getElementById('sel-seccion').focus();
+    return;
+  }
+
+  const icm = inpICM.value.trim().toUpperCase();
+  const sn  = usandoSN ? inpSN.value.trim() : '';
+
+  if (!icm || icm.length < 3) {
+    fb.className = 'form-text text-danger mt-1';
+    fb.textContent = 'ICM demasiado corto (mínimo 3 caracteres)';
+    return;
+  }
+  if (pendientes.find(p => p.icm === icm)) {
+    fb.className = 'form-text text-warning mt-1';
+    fb.textContent = "⚠ '" + icm + "' ya está en la lista";
+  } else {
+    pendientes.push({ icm, sn, ubicacion: getUbicacion() });
+    actualizarLista();
+    fb.className = 'form-text text-success mt-1';
+    fb.textContent = '✓ ' + icm + (sn ? '  ·  S/N: ' + sn : '');
+    toast('✓ ' + icm + ' añadido', 'success', 1500);
+  }
+
+  bloqueado = true;
+  inpICM.value = ''; inpSN.value = '';
+  setTimeout(() => { bloqueado = false; inpICM.focus(); }, BLOQUEO);
+}
+
+// ── Modo entrada: manual / cámara ─────────────────────────────
+let camaraStream    = null;
+let detectorCamara  = null;
+let scanLoop        = null;
+
+function setModoEntrada(modo) {
+  const btnMan = document.getElementById('btn-modo-manual');
+  const btnCam = document.getElementById('btn-modo-camara');
+  const panMan = document.getElementById('panel-manual');
+  const panCam = document.getElementById('panel-camara');
+
+  if (modo === 'camara') {
+    btnCam.classList.add('active');    btnMan.classList.remove('active');
+    panCam.classList.remove('d-none'); panMan.classList.add('d-none');
+    iniciarCamara();
+  } else {
+    btnMan.classList.add('active');    btnCam.classList.remove('active');
+    panMan.classList.remove('d-none'); panCam.classList.add('d-none');
+    pararCamara();
+    inpICM.focus();
+  }
+}
+
+async function iniciarCamara() {
+  const noSop = document.getElementById('camara-no-soporte');
+  if (!('BarcodeDetector' in window)) { noSop.classList.remove('d-none'); return; }
+  noSop.classList.add('d-none');
+  try {
+    camaraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const video = document.getElementById('camara-video');
+    video.srcObject = camaraStream;
+    await video.play();
+    detectorCamara = new BarcodeDetector({ formats: ['code_128','code_39','qr_code','ean_13','ean_8'] });
+    escanearFrame();
+  } catch(e) {
+    document.getElementById('camara-estado').textContent = '⚠ Sin acceso a la cámara: ' + e.message;
+  }
+}
+
+function pararCamara() {
+  if (scanLoop) { clearTimeout(scanLoop); scanLoop = null; }
+  if (camaraStream) { camaraStream.getTracks().forEach(t => t.stop()); camaraStream = null; }
+}
+
+async function escanearFrame() {
+  const video = document.getElementById('camara-video');
+  if (!camaraStream || video.readyState < 2) { scanLoop = setTimeout(escanearFrame, 200); return; }
+  try {
+    const barcodes = await detectorCamara.detect(video);
+    if (barcodes.length > 0) {
+      const valor = barcodes[0].rawValue.trim().toUpperCase();
+      document.getElementById('camara-icm-val').textContent = valor;
+      document.getElementById('camara-icm-panel').classList.remove('d-none');
+      document.getElementById('btn-camara-add').disabled = false;
+      document.getElementById('camara-estado').textContent = '✓ Código detectado';
+      const flash = document.getElementById('scan-flash');
+      flash.style.opacity = '1';
+      setTimeout(() => flash.style.opacity = '0', 200);
+      return; // Pausa hasta que el usuario añada o limpie
+    }
+  } catch(_) {}
+  scanLoop = setTimeout(escanearFrame, 150);
+}
+
+function limpiarScan() {
+  document.getElementById('camara-icm-panel').classList.add('d-none');
+  document.getElementById('btn-camara-add').disabled = true;
+  document.getElementById('camara-icm-val').textContent = '';
+  document.getElementById('camara-estado').innerHTML =
+    '<i class="bi bi-camera me-1"></i>Apunta el código al recuadro rojo';
+  if (document.getElementById('chk-sn').checked)
+    document.getElementById('sn-group-camara').classList.remove('d-none');
+  scanLoop = setTimeout(escanearFrame, 150);
+}
+
+function registrarICMCamara() {
+  const icm    = document.getElementById('camara-icm-val').textContent.trim();
+  const sn     = document.getElementById('inp-sn-camara').value.trim();
+  const sec    = document.getElementById('sel-seccion').value;
+  const marca  = document.getElementById('sel-marca').value;
+  const modelo = getModeloSeleccionado();
+
+  if (!icm) return;
+  if (!sec || !marca || !modelo) {
+    toast('Completa sección, marca y modelo primero', 'warning'); return;
+  }
+  if (pendientes.find(p => p.icm === icm)) {
+    document.getElementById('camara-estado').textContent = '⚠ ' + icm + ' ya está en la lista';
+  } else {
+    pendientes.push({ icm, sn, ubicacion: getUbicacion() });
+    actualizarLista();
+    toast('✓ ' + icm + ' añadido', 'success', 1500);
+  }
+  document.getElementById('inp-sn-camara').value = '';
+  limpiarScan();
+}
+
+// ── TEM: Generar ICM temporal ──────────────────────────────────
+let temModalCodigo = null;
+let temModalImg    = null;
+const mTEM = new bootstrap.Modal(document.getElementById('modalTEM'));
+
+function abrirModalTEM() {
+  document.getElementById('tem-modal-sn').value = '';
+  document.getElementById('tem-modal-preview').classList.add('d-none');
+  temModalCodigo = null; temModalImg = null;
+  mTEM.show();
+  setTimeout(() => document.getElementById('tem-modal-sn').focus(), 300);
+}
+
+let timerTemSN = null;
+document.getElementById('tem-modal-sn').addEventListener('input', () => {
+  clearTimeout(timerTemSN);
+  if (!document.getElementById('tem-modal-sn').value.trim()) return;
+  timerTemSN = setTimeout(() => {
+    if (document.getElementById('tem-modal-sn').value.trim()) confirmarTEM();
+  }, 80);
+});
+document.getElementById('tem-modal-sn').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timerTemSN); confirmarTEM(); }
+});
+
+async function confirmarTEM() {
+  const sn     = document.getElementById('tem-modal-sn').value.trim();
+  const marca  = document.getElementById('sel-marca')?.value   || '';
+  const modelo = document.getElementById('sel-modelo')?.value  || getModeloSeleccionado() || '';
+  const btn    = document.querySelector('#modalTEM .btn-warning');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generando...';
+
+  const r = await _fetch('/etiquetas/tem/generar', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ cantidad: 1, marca, modelo, seccion: '', sns: sn ? [sn] : [], mm: 36 })
+  });
+  const d = await r.json();
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-upc me-1"></i>Generar TEM + etiqueta';
+
+  if (!d.ok || !d.tems?.length) { toast('Error generando TEM', 'danger'); return; }
+
+  const item = d.tems[0];
+  temModalCodigo = item.tem;
+  temModalImg    = item.imagen_b64 ? 'data:image/png;base64,' + item.imagen_b64 : null;
+
+  document.getElementById('tem-modal-codigo').textContent = item.tem;
+  if (temModalImg) document.getElementById('tem-modal-img').src = temModalImg;
+  document.getElementById('tem-modal-preview').classList.remove('d-none');
+
+  inpICM.value = item.tem;
+  document.getElementById('tem-reg-codigo').textContent = item.tem;
+  document.getElementById('tem-reg-info').style.display = 'block';
+  mTEM.hide();
+  toast('TEM generado: ' + item.tem, 'success', 4000);
+}
+
+function verEtiquetaTEM() {
+  if (!temModalCodigo) return;
+  window.open('/etiquetas/generar?icm=' + encodeURIComponent(temModalCodigo), '_blank');
+}
+</script>

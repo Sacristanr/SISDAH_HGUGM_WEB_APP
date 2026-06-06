@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}Control de retirada{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-trash icon-title"></i>Control de retirada</h4>
+</div>
+
+<ul class="nav nav-tabs mb-4" id="tabs-ret">
+  <li class="nav-item">
+    <a class="nav-link active" id="lt-0" href="#" onclick="swTab(0);return false">
+      <i class="bi bi-list-ul me-1"></i>Para baja
+      <span class="badge bg-cm-red ms-1">{{ equipos|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" id="lt-1" href="#" onclick="swTab(1);return false">
+      <i class="bi bi-upc-scan me-1"></i>Registro rapido de baja
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" id="lt-2" href="#" onclick="swTab(2);return false">
+      <i class="bi bi-box-arrow-right me-1"></i>Historial retiradas
+      <span class="badge bg-secondary ms-1">{{ retirados|length }}</span>
+    </a>
+  </li>
+</ul>
+
+<!-- TAB 0: papelera -->
+<div id="t-0">
+  <div class="alert border py-2 small mb-3" style="background:#FFF8E1">
+    <i class="bi bi-info-circle me-1 text-warning"></i>
+    Equipos marcados para baja definitiva. Haz clic en una fila para ver la ficha.
+  </div>
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm mb-0">
+        <thead>
+          <tr>
+            <th class="ps-3">ICM</th><th>Marca/Modelo</th><th>Seccion</th>
+            <th>Retirado por</th><th>Fecha</th><th>Ticket</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for eq in equipos %}
+          <tr id="row-{{ eq.icm }}" class="fila-equipo"
+              onclick="window.location='/inventario/{{ eq.icm }}'"
+              style="cursor:pointer">
+            <td class="ps-3 font-monospace fw-bold text-cm-red">{{ eq.icm }}</td>
+            <td>{{ eq.marca or '' }} {{ eq.modelo or '' }}</td>
+            <td><span class="badge bg-light text-dark border">{{ eq.seccion or '-' }}</span></td>
+            <td class="font-monospace small">{{ eq.retirado_por or '-' }}</td>
+            <td class="small text-muted">{{ eq.fecha_retiro or '-' }}</td>
+            <td class="small">{{ eq.codigo_ticket or '-' }}</td>
+            <td onclick="event.stopPropagation()">
+              <div class="d-flex gap-1">
+                <button class="btn btn-outline-success btn-sm py-0"
+                        onclick="restaurar('{{ eq.icm }}')"
+                        title="Restaurar a stock">
+                  <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+                <button class="btn btn-outline-danger btn-sm py-0"
+                        onclick="eliminarDef('{{ eq.icm }}')"
+                        title="Eliminar definitivamente">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-4">
+              <i class="bi bi-check-circle text-success me-2"></i>No hay equipos pendientes de baja
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 1: scanner rapido -->
+<div id="t-1" class="d-none">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header" style="background:#C8102E;color:white">
+          <i class="bi bi-upc-scan me-2"></i>Registro rapido de baja
+        </div>
+        <div class="card-body">
+          <div class="alert py-2 small mb-3"
+               style="background:#FFEBEE;color:#B71C1C;border:1px solid #FFCDD2">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            Escanea los ICM de equipos que van a reciclaje o desmantelamiento.
+            Se marcaran en papelera con registro en el historial.
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">ICM del equipo</label>
+            <input type="text" id="inp-baja"
+                   class="form-control form-control-lg font-monospace text-center"
+                   placeholder="Escanea el ICM" autocomplete="off">
+            <div id="baja-fb" class="mt-1 small">&nbsp;</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Motivo de baja</label>
+            <select id="sel-motivo" class="form-select">
+              <option>Reciclaje RAEE</option>
+              <option>Desmantelamiento</option>
+              <option>Fin de vida util</option>
+              <option>Dano irreparable</option>
+              <option>Robo o extravio</option>
+            </select>
+          </div>
+
+          <div class="card border-0" style="background:#F8F9FA;border-radius:6px">
+            <div class="card-header border-0 d-flex justify-content-between py-2 small">
+              <span class="fw-bold text-muted">REGISTRADOS ESTA SESION</span>
+              <span class="badge bg-danger" id="cnt-bajas">0</span>
+            </div>
+            <div style="max-height:200px;overflow-y:auto">
+              <ul class="list-group list-group-flush" id="ul-bajas">
+                <li class="list-group-item bg-transparent text-center text-muted small py-3">
+                  Sin equipos todavia
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 2: historial retiradas -->
+<div id="t-2" class="d-none">
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm mb-0">
+        <thead>
+          <tr>
+            <th class="ps-3">ICM</th><th>Marca/Modelo</th><th>Seccion</th>
+            <th>Retirado por</th><th>Fecha retiro</th><th>Ticket</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for eq in retirados %}
+          <tr class="fila-equipo"
+              onclick="window.location='/inventario/{{ eq.icm }}'"
+              style="cursor:pointer">
+            <td class="ps-3 font-monospace fw-bold text-cm-red">{{ eq.icm }}</td>
+            <td>{{ eq.marca or '' }} {{ eq.modelo or '' }}</td>
+            <td><span class="badge bg-light text-dark border">{{ eq.seccion or '-' }}</span></td>
+            <td class="font-monospace small">{{ eq.retirado_por or '-' }}</td>
+            <td class="small text-muted">{{ eq.fecha_retiro or '-' }}</td>
+            <td class="small">{{ eq.codigo_ticket or '-' }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-4">Sin retiradas registradas</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function swTab(i) {
+  [0,1,2].forEach(j => {
+    document.getElementById('t-'+j).classList.toggle('d-none', j!==i);
+    document.getElementById('lt-'+j).classList.toggle('active', j===i);
+  });
+  if (i===1) setTimeout(()=>document.getElementById('inp-baja').focus(), 200);
+}
+
+// Scanner
+let tBaja = null;
+let bajas = [];
+const inp = document.getElementById('inp-baja');
+
+inp.addEventListener('input', () => {
+  clearTimeout(tBaja);
+  if (!inp.value.trim()) return;
+  tBaja = setTimeout(procesarBaja, 80);
+});
+inp.addEventListener('keydown', e => {
+  if (e.key==='Enter') { e.preventDefault(); clearTimeout(tBaja); procesarBaja(); }
+});
+
+async function procesarBaja() {
+  const icm    = inp.value.trim().toUpperCase();
+  const motivo = document.getElementById('sel-motivo').value;
+  const fb     = document.getElementById('baja-fb');
+  if (!icm || icm.length < 3) return;
+  inp.value = '';
+
+  if (bajas.includes(icm)) {
+    fb.innerHTML = '<span class="text-warning">Ya registrado: ' + icm + '</span>';
+    return;
+  }
+
+  const r = await _fetch('/retiradas/cambiar_estado', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({icm, estado:'papelera', motivo})
+  });
+  const d = await r.json();
+
+  if (d.ok) {
+    bajas.push(icm);
+    document.getElementById('cnt-bajas').textContent = bajas.length;
+    const ul = document.getElementById('ul-bajas');
+    if (ul.querySelector('.text-muted')) ul.innerHTML = '';
+    ul.insertAdjacentHTML('afterbegin',
+      '<li class="list-group-item bg-transparent d-flex justify-content-between py-2">' +
+      '<span class="font-monospace small fw-bold text-cm-red">' + icm + '</span>' +
+      '<span class="text-muted small">' + motivo + '</span>' +
+      '</li>');
+    fb.innerHTML = '<span class="text-success"><i class="bi bi-check-circle me-1"></i>' + icm + ' dado de baja</span>';
+    toast(icm + ' enviado a baja', 'warning', 2000);
+    inp.focus();
+  } else {
+    fb.innerHTML = '<span class="text-danger">Error: ' + d.error + '</span>';
+  }
+}
+
+async function restaurar(icm) {
+  if (!await sisdahConfirm('El equipo ' + icm + ' volverá a estar disponible en el inventario.', {title:'Restaurar a stock', btnText:'Restaurar', danger:false, btnClass:'btn-success', icon:'bi-arrow-counterclockwise'})) return;
+  const r = await _fetch('/papelera/restaurar/' + icm, {method:'POST'});
+  const d = await r.json();
+  if (d.ok) { document.getElementById('row-'+icm).remove(); toast('Restaurado: '+icm, 'success'); }
+  else toast('Error: ' + d.error, 'danger');
+}
+
+async function eliminarDef(icm) {
+  if (!await sisdahConfirm('Se eliminará ' + icm + ' de forma permanente. Esta acción no se puede deshacer.', {title:'Eliminar definitivamente', btnText:'Eliminar para siempre', icon:'bi-exclamation-octagon'})) return;
+  const r = await _fetch('/papelera/eliminar/' + icm, {method:'POST'});
+  const d = await r.json();
+  if (d.ok) { document.getElementById('row-'+icm).remove(); toast('Eliminado: '+icm, 'warning'); }
+  else toast('Error: ' + d.error, 'danger');
+}
+</script>
+{% endblock %}

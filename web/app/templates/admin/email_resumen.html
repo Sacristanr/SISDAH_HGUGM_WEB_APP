@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Enviar resumen{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-envelope icon-title"></i>Enviar resumen por correo</h4>
+</div>
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-bar-chart me-2 text-cm-red"></i>Vista previa del resumen</div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tr><th class="ps-3 text-muted">Total equipos</th><td class="fw-bold">{{ total }}</td></tr>
+          <tr><th class="ps-3 text-muted">En stock</th><td class="text-success fw-bold">{{ en_stock }}</td></tr>
+          <tr><th class="ps-3 text-muted">Retirados</th><td class="text-warning fw-bold">{{ retirados }}</td></tr>
+          <tr><th class="ps-3 text-muted">En avería</th><td class="text-danger fw-bold">{{ averias }}</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><i class="bi bi-send me-2 text-cm-red"></i>Enviar informe</div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label">Destinatario *</label>
+          <input type="email" id="dest" class="form-control"
+                 placeholder="jefe@hgugm.es" value="{{ smtp_dest }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Asunto</label>
+          <input type="text" id="asunto" class="form-control"
+                 value="Resumen SISDAH — Inventario HGUGM">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Notas adicionales</label>
+          <textarea id="notas" class="form-control" rows="3"
+                    placeholder="Añade comentarios al resumen…"></textarea>
+        </div>
+        <button class="btn btn-cm-red w-100" id="btn-enviar" onclick="enviar()">
+          <i class="bi bi-send me-2"></i>Enviar resumen
+        </button>
+        <div id="email-fb" class="mt-2"></div>
+        {% if not smtp_configurado %}
+        <div class="alert alert-light border py-2 small mt-3 mb-0">
+          <i class="bi bi-info-circle me-1"></i>
+          Configura el servidor SMTP en
+          <a href="{{ url_for('configuracion.panel') }}" class="text-cm-red">Configuración → Correo SMTP</a>
+          antes de enviar.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function enviar() {
+  const dest = document.getElementById('dest').value.trim();
+  if (!dest) { toast('Introduce un destinatario','warning'); return; }
+  const btn = document.getElementById('btn-enviar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando…';
+  const r = await _fetch('/admin/email/enviar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      dest:   dest,
+      asunto: document.getElementById('asunto').value,
+      notas:  document.getElementById('notas').value,
+    })
+  });
+  const d = await r.json();
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-send me-2"></i>Enviar resumen';
+  if (d.ok) toast('✓ Correo enviado a '+dest);
+  else      toast('Error: '+d.error,'danger',6000);
+}
+</script>
+{% endblock %}

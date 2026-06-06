@@ -1,0 +1,117 @@
+<!-- ══ PANEL TELÉFONO ══════════════════════════════════════════ -->
+<div id="panel-telefono" class="d-none">
+<div class="row justify-content-center">
+<div class="col-md-7 col-lg-6">
+
+  <div class="card">
+    <div class="card-header red-header">
+      <i class="bi bi-telephone me-2"></i>Registrar teléfono Cisco IP
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+
+        <!-- Modelo -->
+        <div class="col-12">
+          <label class="form-label" for="tel-reg-modelo">
+            Modelo <span class="text-cm-red">*</span>
+          </label>
+          <input type="text" id="tel-reg-modelo" class="form-control"
+                 placeholder="Cisco 7942, 8841…" autocomplete="off">
+        </div>
+
+        <!-- NS y MAC -->
+        <div class="col-md-6">
+          <label class="form-label" for="tel-reg-ns">
+            N.º de serie (NS) <span class="text-cm-red">*</span>
+          </label>
+          <input type="text" id="tel-reg-ns" class="form-control font-monospace"
+                 placeholder="FCH1234ABCD" autocomplete="off"
+                 oninput="this.value = this.value.toUpperCase()">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="tel-reg-mac">
+            MAC address <span class="text-cm-red">*</span>
+          </label>
+          <input type="text" id="tel-reg-mac" class="form-control font-monospace"
+                 placeholder="AA:BB:CC:DD:EE:FF" autocomplete="off"
+                 oninput="telFormatMAC(this)">
+        </div>
+        <div class="col-12">
+          <p class="form-text text-muted mb-0" style="margin-top:-.5rem">
+            <i class="bi bi-info-circle me-1"></i>Al menos NS o MAC son obligatorios.
+          </p>
+        </div>
+
+        <!-- IP (opcional) -->
+        <div class="col-md-6">
+          <label class="form-label" for="tel-reg-ip">
+            Dirección IP <span class="text-muted small">(opcional)</span>
+          </label>
+          <input type="text" id="tel-reg-ip" class="form-control font-monospace"
+                 placeholder="10.0.0.1" autocomplete="off">
+        </div>
+
+        <!-- Separador ubicación -->
+        <div class="col-12 mt-2">
+          <p class="section-label"><i class="bi bi-geo-alt me-1" aria-hidden="true"></i>Ubicación física</p>
+        </div>
+
+        <!-- Edificio / Planta / Zona -->
+        <div class="col-md-4">
+          <label class="form-label" for="tel-reg-edificio">Edificio</label>
+          <select id="tel-reg-edificio" class="form-select"
+                  onchange="telFiltrarPlantas()">
+            <option value="">— Edificio —</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="tel-reg-planta">Planta</label>
+          <select id="tel-reg-planta" class="form-select"
+                  onchange="telSeleccionarLoc()">
+            <option value="">— Planta —</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="tel-reg-zona">Zona / Aula</label>
+          <input id="tel-reg-zona" class="form-control" placeholder="Sala 3…" readonly>
+        </div>
+        <input type="hidden" id="tel-reg-loc-id">
+
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="chk-tel-reg-libre"
+                   onchange="telToggleLibre()">
+            <label class="form-check-label text-muted small" for="chk-tel-reg-libre">
+              Ubicación no está en el catálogo — escribir manualmente
+            </label>
+          </div>
+          <input id="tel-reg-ubi-libre" class="form-control mt-2 d-none"
+                 placeholder="Ej: Planta 3, Consulta 12 — Despacho del Dr. García">
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Botón registrar -->
+  <div class="mt-3">
+    <button class="btn btn-cm-red w-100 btn-lg fw-bold" onclick="telGuardar()">
+      <i class="bi bi-check2-circle me-2"></i>Registrar teléfono
+    </button>
+  </div>
+
+  <!-- Confirmación tras guardar -->
+  <div id="tel-reg-ok" class="d-none mt-3">
+    <div class="alert border-0" style="background:#E8F5E9;color:#1B5E20">
+      <i class="bi bi-check-circle-fill me-2"></i>
+      <strong>Teléfono registrado.</strong>
+      <div class="small mt-1" id="tel-reg-ok-label"></div>
+    </div>
+    <button class="btn btn-outline-secondary w-100" onclick="telReset()">
+      <i class="bi bi-plus-circle me-1"></i>Registrar otro
+    </button>
+  </div>
+
+</div>
+</div>
+</div>{# /panel-telefono #}

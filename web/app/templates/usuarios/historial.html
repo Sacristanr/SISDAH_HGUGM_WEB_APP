@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Historial de usuario{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-person-lines-fill icon-title"></i>Historial por usuario</h4>
+</div>
+
+<!-- Buscador -->
+<div class="card mb-4">
+  <div class="card-body py-3">
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-md-5">
+        <label class="form-label fw-semibold">DNI o nombre del usuario</label>
+        <input type="text" name="q" value="{{ q }}" class="form-control form-control-lg font-monospace"
+               placeholder="12345678A o nombre..." autocomplete="off" list="lista-usuarios">
+        <datalist id="lista-usuarios">
+          {% for u in usuarios %}
+          <option value="{{ u.dni }}">{{ u.nombre }}</option>
+          {% endfor %}
+        </datalist>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-cm-red btn-lg">
+          <i class="bi bi-search me-2"></i>Buscar
+        </button>
+        {% if q %}
+        <a href="{{ url_for('usuarios_hist.buscar') }}" class="btn btn-outline-secondary btn-lg">Limpiar</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if q and not movimientos %}
+<div class="alert alert-light border text-center py-4">
+  <i class="bi bi-person-x fs-2 text-muted d-block mb-2"></i>
+  No se encontraron movimientos para <strong>{{ q }}</strong>
+</div>
+
+{% elif movimientos %}
+<!-- Info del usuario -->
+{% if usuario %}
+<div class="card mb-3">
+  <div class="card-body d-flex align-items-center gap-4 py-3">
+    <div>
+      <div class="fw-bold fs-5">{{ usuario.nombre }}</div>
+      <div class="font-monospace text-muted small">{{ usuario.dni }}</div>
+      {% if usuario.email %}<div class="text-muted small">{{ usuario.email }}</div>{% endif %}
+    </div>
+    <span class="badge {% if usuario.rol=='gestor_n3' %}bg-cm-red{% elif usuario.rol=='gestor_n1' %}badge-estado-reservado{% else %}bg-light text-dark border{% endif %} ms-2">{{ usuario.rol }}</span>
+    <div class="ms-auto d-flex gap-3 text-center">
+      <div><div class="fw-bold text-cm-red fs-4">{{ stats.retiradas }}</div><div class="text-muted small">Retiradas</div></div>
+      <div><div class="fw-bold" style="color:#E67E22;font-size:1.5rem">{{ stats.averias }}</div><div class="text-muted small">Averias</div></div>
+      <div><div class="fw-bold" style="color:#7B2FBE;font-size:1.5rem">{{ stats.reacondicionados }}</div><div class="text-muted small">Reacond.</div></div>
+      <div><div class="fw-bold text-success fs-4">{{ stats.entradas }}</div><div class="text-muted small">Entradas</div></div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Filtros rápidos -->
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <button class="btn btn-sm btn-outline-secondary active" onclick="filtrar('todos',this)">Todos ({{ stats.total }})</button>
+  <button class="btn btn-sm btn-outline-cm-red" onclick="filtrar('retirada',this)">
+    <i class="bi bi-box-arrow-right me-1"></i>Retiradas ({{ stats.retiradas }})
+  </button>
+  <button class="btn btn-sm btn-outline-danger" onclick="filtrar('averia',this)">
+    <i class="bi bi-exclamation-triangle me-1"></i>Averias ({{ stats.averias }})
+  </button>
+  <button class="btn btn-sm btn-outline-success" onclick="filtrar('entrada',this)">
+    <i class="bi bi-plus-circle me-1"></i>Entradas ({{ stats.entradas }})
+  </button>
+  <button class="btn btn-sm btn-outline-secondary" onclick="filtrar('otros',this)">
+    <i class="bi bi-arrow-repeat me-1"></i>Otros
+  </button>
+</div>
+
+<!-- Tabla de movimientos -->
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0" id="tabla-movs">
+      <thead>
+        <tr>
+          <th class="ps-3">Fecha</th><th>ICM</th><th>Marca/Modelo</th>
+          <th>Seccion</th><th>Tipo</th><th>Descripcion</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for mov, eq in movimientos %}
+        <tr class="fila-equipo mov-row"
+            data-tipo="{{ mov.tipo }}"
+            data-desc="{{ (mov.descripcion or '') | lower }}"
+            onclick="window.location='/inventario/{{ mov.icm }}'"
+            style="cursor:pointer"
+            title="Ver ficha de {{ mov.icm }}">
+          <td class="ps-3 small text-muted">{{ mov.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td class="font-monospace fw-bold text-cm-red">{{ mov.icm }}</td>
+          <td class="small">
+            {% if eq %}{{ eq.marca or '' }} {{ eq.modelo or '' }}{% else %}<span class="text-muted">-</span>{% endif %}
+          </td>
+          <td>
+            {% if eq and eq.seccion %}
+            <span class="badge bg-light text-dark border">{{ eq.seccion }}</span>
+            {% else %}-{% endif %}
+          </td>
+          <td>
+            {% if mov.tipo == 'retirada' %}
+              <span class="badge badge-estado-retirado">retirada</span>
+            {% elif mov.tipo == 'entrada' %}
+              <span class="badge badge-estado-stock">entrada</span>
+            {% elif mov.tipo == 'averia' or 'averia' in (mov.descripcion or '')|lower %}
+              <span class="badge badge-estado-averia">averia</span>
+            {% elif 'reacondicionado' in (mov.descripcion or '')|lower %}
+              <span class="badge" style="background:#F3E5F5;color:#7B2FBE">reacondicionado</span>
+            {% elif mov.tipo == 'revision' %}
+              <span class="badge badge-estado-reservado">revision</span>
+            {% else %}
+              <span class="badge bg-light text-dark border small">{{ mov.tipo }}</span>
+            {% endif %}
+          </td>
+          <td class="small text-muted" style="max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            {{ mov.descripcion or '-' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<small class="text-muted">{{ movimientos|length }} movimientos</small>
+
+{% else %}
+<div class="alert alert-light border text-center py-5">
+  <i class="bi bi-person-lines-fill fs-1 text-muted d-block mb-2"></i>
+  <strong>Busca un usuario por DNI o nombre</strong>
+  <p class="text-muted small mb-0 mt-1">Veras todas sus retiradas, averias, entradas y modificaciones</p>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+function filtrar(tipo, btn) {
+  document.querySelectorAll('.mov-row').forEach(row => {
+    const t = row.dataset.tipo;
+    const d = row.dataset.desc;
+    let mostrar = true;
+    if (tipo === 'retirada') mostrar = t === 'retirada';
+    else if (tipo === 'averia') mostrar = t === 'averia' || d.includes('averia');
+    else if (tipo === 'entrada') mostrar = t === 'entrada';
+    else if (tipo === 'otros') mostrar = !['retirada','averia','entrada'].includes(t);
+    row.classList.toggle('d-none', !mostrar);
+  });
+  document.querySelectorAll('.d-flex .btn-sm').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
+{% endblock %}

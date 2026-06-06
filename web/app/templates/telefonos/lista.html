@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+{% block title %}Teléfonos Cisco{% endblock %}
+{% block content %}
+
+{# ── Stats rápidas ─────────────────────────────────────────────── #}
+{% set total      = telefonos | length %}
+{% set colocados  = telefonos | selectattr('ubicacion') | list | length %}
+{% set sin_ubi    = total - colocados %}
+{% set en_averia  = telefonos | selectattr('estado', 'eq', 'averia') | list | length %}
+
+<div class="page-header mb-3">
+  <h4 class="page-title"><i class="bi bi-telephone icon-title"></i>Teléfonos Cisco IP</h4>
+  {% if current_user.es_gestor %}
+  <a href="{{ url_for('registrar.form') }}?modo=telefono" class="btn btn-cm-red btn-sm">
+    <i class="bi bi-plus-circle me-1"></i>Registrar teléfono
+  </a>
+  {% endif %}
+</div>
+
+<!-- KPIs -->
+<div class="row g-2 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card stat-card blue text-center p-3">
+      <div class="stat-num blue">{{ total }}</div>
+      <div class="stat-lbl">Total en stock</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card green text-center p-3">
+      <div class="stat-num green">{{ colocados }}</div>
+      <div class="stat-lbl">Colocados</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card gray text-center p-3">
+      <div class="stat-num">{{ sin_ubi }}</div>
+      <div class="stat-lbl">Sin ubicar</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card red text-center p-3">
+      <div class="stat-num red">{{ en_averia }}</div>
+      <div class="stat-lbl">Averías</div>
+    </div>
+  </div>
+</div>
+
+<!-- Buscador -->
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="GET" class="row g-2 align-items-center">
+      <div class="col-md-4">
+        <input type="text" name="q" value="{{ q }}" class="form-control"
+               placeholder="Extensión, modelo, NS, MAC, IP, ubicación…">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-cm-red"><i class="bi bi-search"></i></button>
+        <a href="{{ url_for('telefonos.lista') }}" class="btn btn-outline-secondary">Limpiar</a>
+      </div>
+      <div class="col-auto ms-auto text-muted small">
+        {{ telefonos | length }} resultado{% if telefonos | length != 1 %}s{% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Tabla -->
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0">
+      <thead>
+        <tr>
+          <th class="ps-3">Ext.</th>
+          <th>Modelo</th>
+          <th>NS</th>
+          <th>MAC</th>
+          <th>IP</th>
+          <th>Ubicación</th>
+          <th>Estado</th>
+          {% if current_user.es_gestor %}<th></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in telefonos %}
+        <tr id="tel-{{ t.id }}">
+          <td class="ps-3 font-monospace fw-bold text-cm-red">
+            {{ t.extension or '—' }}
+          </td>
+          <td>{{ t.modelo or '—' }}</td>
+          <td class="font-monospace small">{{ t.ns or '—' }}</td>
+          <td class="font-monospace small">{{ t.mac or '—' }}</td>
+          <td class="font-monospace small">{{ t.ip or '—' }}</td>
+          <td class="small">
+            {% if t.ubicacion_rel %}
+              <span class="badge" style="background:var(--cm-blue-light);color:var(--cm-blue)">
+                <i class="bi bi-geo-alt me-1"></i>{{ t.ubicacion_rel.edificio }}
+              </span>
+              <span class="text-muted small ms-1">
+                {{ t.ubicacion_rel.planta }}{% if t.ubicacion_rel.zona %} · {{ t.ubicacion_rel.zona }}{% endif %}
+              </span>
+            {% elif t.ubicacion_libre %}
+              <span class="text-muted">{{ t.ubicacion_libre }}</span>
+            {% else %}
+              <span class="badge bg-light text-muted border">Sin ubicar</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if t.estado == 'activo' %}
+              <span class="badge badge-estado-stock">activo</span>
+            {% elif t.estado == 'averia' %}
+              <span class="badge badge-estado-averia">avería</span>
+            {% else %}
+              <span class="badge bg-light text-dark border">{{ t.estado }}</span>
+            {% endif %}
+          </td>
+          {% if current_user.es_gestor %}
+          <td>
+            <button class="btn btn-outline-secondary btn-sm py-0"
+                    onclick='editarTel({{ t.to_dict()|tojson }})'
+                    title="Editar">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-outline-danger btn-sm py-0 ms-1"
+                    onclick="eliminar({{ t.id }})"
+                    title="Eliminar">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="{{ 8 if current_user.es_gestor else 7 }}"
+              class="text-center text-muted py-5">
+            <i class="bi bi-telephone" style="font-size:2rem;opacity:.2"></i>
+            <p class="mb-0 mt-2">Sin teléfonos registrados</p>
+            {% if current_user.es_gestor %}
+            <a href="{{ url_for('registrar.form') }}?modo=telefono"
+               class="btn btn-cm-red btn-sm mt-3">
+              <i class="bi bi-plus-circle me-1"></i>Registrar el primero
+            </a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if current_user.es_gestor %}
+<!-- ══ Modal edición (sólo gestores) ════════════════════════════ -->
+<div class="modal fade" id="modalTel" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:var(--cm-red-light);border-bottom:1px solid rgba(200,16,46,.15)">
+        <h5 class="modal-title fw-bold text-cm-red">
+          <i class="bi bi-telephone me-2"></i>Editar teléfono
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="tel-id">
+        <div class="row g-3">
+
+          <div class="col-12"><p class="section-label">Identificación</p></div>
+          <div class="col-md-3">
+            <label class="form-label">Extensión</label>
+            <input id="tel-ext" class="form-control font-monospace" placeholder="1234 (opcional)">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Modelo</label>
+            <input id="tel-mod" class="form-control" placeholder="Cisco 7942">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Estado</label>
+            <select id="tel-est" class="form-select">
+              <option value="activo">Activo</option>
+              <option value="inactivo">Inactivo</option>
+              <option value="averia">Avería</option>
+            </select>
+          </div>
+
+          <div class="col-12"><p class="section-label">Red</p></div>
+          <div class="col-md-4">
+            <label class="form-label">NS</label>
+            <input id="tel-ns" class="form-control font-monospace" placeholder="FCH1234ABCD">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">MAC</label>
+            <input id="tel-mac" class="form-control font-monospace" placeholder="AA:BB:CC:DD:EE:FF">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">IP</label>
+            <input id="tel-ip" class="form-control font-monospace" placeholder="10.0.0.1">
+          </div>
+
+          <div class="col-12"><p class="section-label">Ubicación física</p></div>
+          <div class="col-md-4">
+            <label class="form-label">Edificio</label>
+            <select id="tel-edificio" class="form-select" onchange="filtrarPlantas('tel')">
+              <option value="">— Selecciona edificio —</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Planta</label>
+            <select id="tel-planta" class="form-select" onchange="seleccionarLocalizacion('tel')">
+              <option value="">— Selecciona planta —</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Zona <span class="text-muted small">(opcional)</span></label>
+            <input id="tel-zona" class="form-control" placeholder="Sala 3…" readonly>
+          </div>
+          <input type="hidden" id="tel-loc-id">
+
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="chk-tel-libre"
+                     onchange="toggleUbicacionLibre('tel')">
+              <label class="form-check-label text-muted small" for="chk-tel-libre">
+                Ubicación no está en el catálogo — escribir manualmente
+              </label>
+            </div>
+            <input id="tel-ubi-libre" class="form-control mt-2 d-none"
+                   placeholder="Ej: Planta 3, Consulta 12">
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Notas</label>
+            <textarea id="tel-not" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-cm-red" onclick="guardarTel()">
+          <i class="bi bi-check-circle me-1"></i>Guardar cambios
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal gestor de localizaciones -->
+<div class="modal fade" id="modalLoc" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:var(--cm-blue-light);border-bottom:1px solid #C5D2EE">
+        <h5 class="modal-title fw-bold text-cm-blue">
+          <i class="bi bi-geo-alt me-2"></i>Catálogo de localizaciones
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 mb-3">
+          <div class="col-md-4"><input id="new-edificio" class="form-control" placeholder="Edificio *"></div>
+          <div class="col-md-3"><input id="new-planta"   class="form-control" placeholder="Planta *"></div>
+          <div class="col-md-3"><input id="new-zona"     class="form-control" placeholder="Zona (opcional)"></div>
+          <div class="col-md-2">
+            <button class="btn btn-cm-red w-100" onclick="addLocalizacion()">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0" id="tabla-locs">
+            <thead><tr><th>Edificio</th><th>Planta</th><th>Zona</th><th></th></tr></thead>
+            <tbody id="tbody-locs"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let localizaciones = {{ localizaciones | map(attribute='to_dict') | list | tojson }};
+
+{% if current_user.es_gestor %}
+const modalTel = new bootstrap.Modal(document.getElementById('modalTel'));
+const modalLoc = new bootstrap.Modal(document.getElementById('modalLoc'));
+
+function poblarEdificios(prefix) {
+  const edificios = [...new Set(localizaciones.map(l => l.edificio))].sort();
+  const sel = document.getElementById(prefix + '-edificio');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— Selecciona edificio —</option>';
+  edificios.forEach(e => {
+    const o = document.createElement('option');
+    o.value = o.textContent = e;
+    if (e === cur) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+function filtrarPlantas(prefix) {
+  const ed = document.getElementById(prefix + '-edificio').value;
+  const sel = document.getElementById(prefix + '-planta');
+  sel.innerHTML = '<option value="">— Selecciona planta —</option>';
+  localizaciones.filter(l => l.edificio === ed)
+    .sort((a,b) => a.planta.localeCompare(b.planta))
+    .forEach(l => {
+      const o = document.createElement('option');
+      o.value = l.id;
+      o.textContent = l.planta + (l.zona ? ' · ' + l.zona : '');
+      sel.appendChild(o);
+    });
+  document.getElementById(prefix + '-loc-id').value = '';
+  document.getElementById(prefix + '-zona').value   = '';
+}
+
+function seleccionarLocalizacion(prefix) {
+  const pid = document.getElementById(prefix + '-planta').value;
+  const loc = localizaciones.find(l => l.id == pid);
+  document.getElementById(prefix + '-loc-id').value = pid || '';
+  document.getElementById(prefix + '-zona').value   = loc?.zona || '';
+}
+
+function toggleUbicacionLibre(prefix) {
+  const libre = document.getElementById('chk-' + prefix + '-libre').checked;
+  document.getElementById(prefix + '-edificio').disabled = libre;
+  document.getElementById(prefix + '-planta').disabled   = libre;
+  document.getElementById(prefix + '-zona').disabled     = libre;
+  document.getElementById(prefix + '-ubi-libre').classList.toggle('d-none', !libre);
+  if (libre) document.getElementById(prefix + '-loc-id').value = '';
+}
+
+function editarTel(t) {
+  document.getElementById('tel-id').value  = t.id;
+  document.getElementById('tel-ext').value = t.extension || '';
+  document.getElementById('tel-mod').value = t.modelo    || '';
+  document.getElementById('tel-ns').value  = t.ns        || '';
+  document.getElementById('tel-mac').value = t.mac       || '';
+  document.getElementById('tel-ip').value  = t.ip        || '';
+  document.getElementById('tel-est').value = t.estado    || 'activo';
+  document.getElementById('tel-not').value = t.notas     || '';
+
+  poblarEdificios('tel');
+
+  if (t.ubicacion_id) {
+    const loc = localizaciones.find(l => l.id == t.ubicacion_id);
+    if (loc) {
+      document.getElementById('tel-edificio').value = loc.edificio;
+      filtrarPlantas('tel');
+      document.getElementById('tel-planta').value  = t.ubicacion_id;
+      document.getElementById('tel-loc-id').value  = t.ubicacion_id;
+      document.getElementById('tel-zona').value    = loc.zona || '';
+    }
+    document.getElementById('chk-tel-libre').checked = false;
+    document.getElementById('tel-ubi-libre').classList.add('d-none');
+    ['tel-edificio','tel-planta','tel-zona'].forEach(id => document.getElementById(id).disabled = false);
+  } else if (t.ubicacion_libre) {
+    document.getElementById('chk-tel-libre').checked = true;
+    document.getElementById('tel-ubi-libre').value   = t.ubicacion_libre;
+    document.getElementById('tel-ubi-libre').classList.remove('d-none');
+    document.getElementById('tel-edificio').disabled = true;
+    document.getElementById('tel-planta').disabled   = true;
+  } else {
+    document.getElementById('chk-tel-libre').checked = false;
+    document.getElementById('tel-ubi-libre').classList.add('d-none');
+    filtrarPlantas('tel');
+    document.getElementById('tel-loc-id').value = '';
+  }
+
+  modalTel.show();
+}
+
+async function guardarTel() {
+  const libre = document.getElementById('chk-tel-libre').checked;
+  const payload = {
+    id:              document.getElementById('tel-id').value || null,
+    extension:       document.getElementById('tel-ext').value.trim() || null,
+    modelo:          document.getElementById('tel-mod').value.trim(),
+    ns:              document.getElementById('tel-ns').value.trim(),
+    mac:             document.getElementById('tel-mac').value.trim(),
+    ip:              document.getElementById('tel-ip').value.trim(),
+    estado:          document.getElementById('tel-est').value,
+    notas:           document.getElementById('tel-not').value.trim(),
+    ubicacion_id:    libre ? null : (document.getElementById('tel-loc-id').value || null),
+    ubicacion_libre: libre ? document.getElementById('tel-ubi-libre').value.trim() : '',
+  };
+  const r = await _fetch('/telefonos/guardar', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  });
+  const d = await r.json();
+  if (d.ok) { modalTel.hide(); location.reload(); }
+  else toast('Error: ' + d.error, 'danger');
+}
+
+async function eliminar(id) {
+  if (!await sisdahConfirm('¿Eliminar este teléfono del sistema?',
+      {title:'Eliminar teléfono', btnText:'Eliminar'})) return;
+  const r = await _fetch(`/telefonos/eliminar/${id}`, {method:'POST'});
+  const d = await r.json();
+  if (d.ok) {
+    document.getElementById(`tel-${id}`).remove();
+    toast('Teléfono eliminado','success');
+  }
+}
+
+// ── Gestor de localizaciones ───────────────────────────────────
+function abrirGestorLocalizaciones() {
+  renderTablaLocs();
+  modalLoc.show();
+}
+
+function renderTablaLocs() {
+  const tbody = document.getElementById('tbody-locs');
+  tbody.innerHTML = localizaciones.length === 0
+    ? '<tr><td colspan="4" class="text-center text-muted py-3">Sin localizaciones</td></tr>'
+    : localizaciones.map(l => `
+      <tr>
+        <td class="fw-semibold">${l.edificio}</td>
+        <td>${l.planta}</td>
+        <td class="text-muted small">${l.zona||'—'}</td>
+        <td>
+          <button class="btn btn-outline-danger btn-sm py-0" onclick="borrarLoc(${l.id})">
+            <i class="bi bi-trash"></i>
+          </button>
+        </td>
+      </tr>`).join('');
+}
+
+async function addLocalizacion() {
+  const edificio = document.getElementById('new-edificio').value.trim();
+  const planta   = document.getElementById('new-planta').value.trim();
+  const zona     = document.getElementById('new-zona').value.trim();
+  if (!edificio || !planta) { toast('Edificio y planta son obligatorios','warning'); return; }
+  const r = await _fetch('/telefonos/localizaciones/guardar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({edificio, planta, zona})
+  });
+  const d = await r.json();
+  if (d.ok) {
+    localizaciones.push(d.loc);
+    localizaciones.sort((a,b) => a.edificio.localeCompare(b.edificio)||a.planta.localeCompare(b.planta));
+    ['new-edificio','new-planta','new-zona'].forEach(id => document.getElementById(id).value = '');
+    renderTablaLocs();
+    toast('Localización añadida','success');
+  } else toast(d.error,'danger');
+}
+
+async function borrarLoc(id) {
+  if (!await sisdahConfirm(
+    '¿Eliminar esta localización? Los teléfonos vinculados perderán su ubicación estructurada.',
+    {title:'Eliminar localización', btnText:'Eliminar'})) return;
+  const r = await _fetch(`/telefonos/localizaciones/eliminar/${id}`, {method:'POST'});
+  const d = await r.json();
+  if (d.ok) {
+    localizaciones = localizaciones.filter(l => l.id !== id);
+    renderTablaLocs();
+    toast('Localización eliminada','success');
+  }
+}
+{% endif %}
+</script>
+{% endblock %}

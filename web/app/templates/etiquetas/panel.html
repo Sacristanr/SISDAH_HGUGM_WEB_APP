@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+{% block title %}Etiquetas y codigos{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-upc icon-title"></i>Generador de etiquetas</h4>
+</div>
+
+{% if not labels_ok %}
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle me-2"></i>
+  Librerias no disponibles. Ejecuta:
+  <code>pip install python-barcode qrcode[pil] pillow</code>
+</div>
+{% endif %}
+
+<div class="card mb-4">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-center">
+      <div class="col-auto">
+        <label class="form-label mb-0 fw-semibold"><i class="bi bi-printer me-1"></i>Impresora:</label>
+      </div>
+      <div class="col-auto">
+        <select id="sel-ancho" class="form-select form-select-sm" style="width:auto">
+          <option value="36" selected>Epson LM-90 — cinta 36mm (recomendado)</option>
+          <option value="24">Cinta 24mm</option>
+          <option value="18">Cinta 18mm</option>
+          <option value="12">Cinta 12mm (solo barcode)</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <small class="text-muted">El ancho de cinta determina el tamaño de la etiqueta</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <!-- Etiqueta por ICM existente -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-upc me-2 text-cm-red"></i>Etiqueta de equipo existente</div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          Introduce el ICM de cualquier equipo ya registrado para generar su etiqueta con codigo de barras y QR.
+        </p>
+        <div class="mb-3">
+          <label class="form-label">ICM del equipo</label>
+          <input type="text" id="icm-exist" class="form-control form-control-lg font-monospace text-center"
+                 placeholder="Escanea o escribe el ICM" autocomplete="off">
+        </div>
+        <div class="d-grid gap-2">
+          <button class="btn btn-cm-red" onclick="previsualizarExist()">
+            <i class="bi bi-eye me-2"></i>Previsualizar etiqueta
+          </button>
+          <button class="btn btn-outline-secondary" onclick="descargarExist()">
+            <i class="bi bi-download me-2"></i>Descargar PNG
+          </button>
+        </div>
+        <div id="exist-fb" class="mt-2 small"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generar TEM en lote -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-plus-circle me-2 text-cm-red"></i>Generar TEM (1 o en lote)</div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          Codigos TEM unicos garantizados. Para un pale de 30 impresoras sin ICM: indica la cantidad y los S/N.
+        </p>
+        <div class="mb-2">
+          <label class="form-label">Marca</label>
+          <input type="text" id="tem-marca" class="form-control" placeholder="BROTHER, LENOVO...">
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Modelo</label>
+          <input type="text" id="tem-modelo" class="form-control" placeholder="HL-5215DN...">
+        </div>
+        <div class="mb-2">
+          <label class="form-label">
+            Cantidad
+            <span class="badge bg-cm-red ms-1" id="badge-cant">1</span>
+          </label>
+          <input type="number" id="tem-cantidad" class="form-control" value="1" min="1" max="200"
+                 oninput="actualizarCantidad()">
+        </div>
+        <div class="mb-2" id="sns-zona" style="display:none">
+          <label class="form-label fw-semibold">
+            Escanear S/N
+            <span class="badge bg-cm-red ms-1" id="cnt-sns">0</span>
+          </label>
+          <!-- Campo de escáner -->
+          <div class="input-group mb-2">
+            <span class="input-group-text bg-cm-red text-white border-cm-red">
+              <i class="bi bi-upc-scan"></i>
+            </span>
+            <input type="text" id="inp-sn-scan"
+                   class="form-control form-control-lg font-monospace text-center"
+                   placeholder="Escanea o escribe el S/N..." autocomplete="off">
+          </div>
+          <div id="sn-scan-fb" class="form-text mb-1">&nbsp;</div>
+          <!-- Lista de S/N escaneados -->
+          <div style="max-height:140px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:6px"
+               id="sns-lista-wrap" class="d-none">
+            <ul class="list-group list-group-flush" id="sns-lista"></ul>
+          </div>
+          <div class="d-flex justify-content-between mt-1">
+            <small class="text-muted">También puedes escribirlos a mano</small>
+            <button class="btn btn-link btn-sm py-0 text-danger" onclick="limpiarSNS()" id="btn-limpiar-sns" style="display:none">
+              <i class="bi bi-trash me-1"></i>Limpiar lista
+            </button>
+          </div>
+        </div>
+        <div class="mb-3" id="sn-simple-zona">
+          <label class="form-label">S/N <span class="text-muted">(opcional)</span></label>
+          <input type="text" id="tem-sn" class="form-control font-monospace" placeholder="Numero de serie">
+        </div>
+
+        <button class="btn btn-warning text-dark w-100 fw-bold" onclick="generarTEMLote()" id="btn-gen-tem">
+          <i class="bi bi-upc me-2"></i>Generar <span id="txt-btn-cant">1</span> TEM + Etiqueta(s)
+        </button>
+
+        <div id="tem-result" class="mt-3 d-none">
+          <div class="alert py-2 mb-2" style="background:#FFF8E1;color:#795548;border:1px solid #FFE082">
+            <i class="bi bi-check-circle me-1"></i>
+            <strong id="tem-resumen"></strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Etiqueta manual (sin ICM) -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-input-cursor me-2 text-cm-red"></i>Etiqueta manual (solo S/N)</div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          Para equipos que solo tienen numero de serie. El codigo de barras y QR se generan con el S/N como identificador.
+        </p>
+        <div class="mb-2">
+          <label class="form-label">S/N <span class="text-cm-red">*</span></label>
+          <input type="text" id="manual-sn" class="form-control font-monospace" placeholder="Numero de serie">
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Marca</label>
+          <input type="text" id="manual-marca" class="form-control" placeholder="LENOVO...">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Modelo</label>
+          <input type="text" id="manual-modelo" class="form-control" placeholder="ThinkPad L14...">
+        </div>
+        <button class="btn btn-outline-cm-red w-100" onclick="etiquetaManual()">
+          <i class="bi bi-upc me-2"></i>Generar etiqueta S/N
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Preview de etiqueta -->
+<div id="preview-zone" class="mt-4 d-none">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-image me-2 text-cm-red"></i>Vista previa de la etiqueta</span>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm" onclick="imprimirEtiqueta()">
+          <i class="bi bi-printer me-1"></i>Imprimir
+        </button>
+        <button class="btn btn-cm-red btn-sm" onclick="descargarPreview()">
+          <i class="bi bi-download me-1"></i>Descargar PNG
+        </button>
+      </div>
+    </div>
+    <div class="card-body text-center py-4">
+      <img id="preview-img" src="" alt="Etiqueta" style="max-width:100%;border:1px solid #ddd;border-radius:6px">
+      <div class="mt-2 text-muted small" id="preview-info"></div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+let previewUrl = '';
+
+function getMM() { return document.getElementById('sel-ancho').value; }
+
+async function previsualizarExist() {
+  const icm = document.getElementById('icm-exist').value.trim().toUpperCase();
+  const fb  = document.getElementById('exist-fb');
+  if (!icm) { toast('Introduce el ICM', 'warning'); return; }
+  const url = '/etiquetas/generar?icm=' + encodeURIComponent(icm) + '&mm=' + getMM();
+  mostrarPreview(url, 'ICM: ' + icm);
+  fb.innerHTML = '';
+}
+
+function descargarExist() {
+  const icm = document.getElementById('icm-exist').value.trim().toUpperCase();
+  if (!icm) { toast('Introduce el ICM', 'warning'); return; }
+  window.open('/etiquetas/descargar?icm=' + encodeURIComponent(icm) + '&mm=' + getMM(), '_blank');
+}
+
+// ── Lista de S/N escaneados ───────────────────────────────────
+let snsList = [];
+let timerSN = null;
+let bloqSN  = false;
+
+function actualizarCantidad(mantenerFoco = false) {
+  const n = parseInt(document.getElementById('tem-cantidad').value) || 1;
+  document.getElementById('badge-cant').textContent = n;
+  document.getElementById('txt-btn-cant').textContent = n;
+  const esLote = n > 1 || snsList.length > 0;
+  document.getElementById('sns-zona').style.display       = esLote ? 'block' : 'none';
+  document.getElementById('sn-simple-zona').style.display = esLote ? 'none'  : 'block';
+  if (esLote && mantenerFoco !== false) {
+    // No robar el foco si está en otro sitio
+    const activo = document.activeElement;
+    if (!activo || activo === document.body || activo === document.getElementById('tem-cantidad')) {
+      document.getElementById('inp-sn-scan').focus();
+    }
+  }
+}
+
+// Escáner de S/N (mismo patrón que pistola barcode)
+const inpSNScan = document.getElementById('inp-sn-scan');
+inpSNScan.addEventListener('input', () => {
+  if (bloqSN) { inpSNScan.value = ''; return; }
+  clearTimeout(timerSN);
+  if (!inpSNScan.value.trim()) return;
+  timerSN = setTimeout(agregarSN, 80);
+});
+inpSNScan.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timerSN); agregarSN(); }
+});
+
+function agregarSN() {
+  const sn = inpSNScan.value.trim();
+  inpSNScan.value = '';
+  if (!sn) return;
+
+  // Bloqueo breve anti-buffer
+  bloqSN = true;
+  setTimeout(() => { bloqSN = false; inpSNScan.focus(); }, 250);
+
+  const fb = document.getElementById('sn-scan-fb');
+  if (snsList.includes(sn)) {
+    fb.className = 'form-text text-warning';
+    fb.textContent = '⚠ S/N ya en la lista: ' + sn;
+    return;
+  }
+
+  snsList.push(sn);
+  actualizarListaSNS();
+  fb.className = 'form-text text-success';
+  fb.textContent = '✓ ' + sn + ' — ' + snsList.length + ' escaneados';
+
+  // Actualizar cantidad sin tocar el foco
+  document.getElementById('tem-cantidad').value = snsList.length;
+  document.getElementById('badge-cant').textContent = snsList.length;
+  document.getElementById('txt-btn-cant').textContent = snsList.length;
+  // El foco vuelve al escáner cuando termina el bloqueo (bloqSN → 250ms)
+}
+
+function actualizarListaSNS() {
+  const ul   = document.getElementById('sns-lista');
+  const wrap = document.getElementById('sns-lista-wrap');
+  const cnt  = document.getElementById('cnt-sns');
+  const btnL = document.getElementById('btn-limpiar-sns');
+
+  cnt.textContent = snsList.length;
+  if (snsList.length === 0) {
+    wrap.classList.add('d-none');
+    btnL.style.display = 'none';
+    return;
+  }
+  wrap.classList.remove('d-none');
+  btnL.style.display = 'inline';
+  ul.innerHTML = snsList.map((sn, i) =>
+    `<li class="list-group-item py-1 d-flex justify-content-between align-items-center">
+      <span class="font-monospace small">${sn}</span>
+      <button class="btn btn-link btn-sm py-0 text-danger" onclick="quitarSN(${i})">
+        <i class="bi bi-x"></i>
+      </button>
+    </li>`
+  ).join('');
+}
+
+function quitarSN(i) {
+  snsList.splice(i, 1);
+  actualizarListaSNS();
+  document.getElementById('tem-cantidad').value = Math.max(1, snsList.length);
+  actualizarCantidad();
+}
+
+function limpiarSNS() {
+  snsList = [];
+  actualizarListaSNS();
+  document.getElementById('tem-cantidad').value = 1;
+  actualizarCantidad();
+  document.getElementById('sn-scan-fb').textContent = '';
+}
+
+async function generarTEMLote() {
+  const marca    = document.getElementById('tem-marca').value.trim();
+  const modelo   = document.getElementById('tem-modelo').value.trim();
+  const cantidad = parseInt(document.getElementById('tem-cantidad').value) || 1;
+  const mm       = getMM();
+  let sns = [];
+
+  if (cantidad > 1) {
+    sns = [...snsList];  // usar los S/N escaneados
+  } else {
+    const sn = document.getElementById('tem-sn').value.trim();
+    if (sn) sns = [sn];
+  }
+
+  const btn = document.getElementById('btn-gen-tem');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generando...';
+
+  const r = await _fetch('/etiquetas/tem/generar', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({cantidad, marca, modelo, seccion: '', sns, mm: parseInt(mm)})
+  });
+  const d = await r.json();
+
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-upc me-2"></i>Generar <span id="txt-btn-cant">' + cantidad + '</span> TEM + Etiqueta(s)';
+
+  if (!d.ok) { toast('Error: ' + d.error, 'danger'); return; }
+
+  // Mostrar resultado
+  const res = document.getElementById('tem-result');
+  const resumen = document.getElementById('tem-resumen');
+  res.classList.remove('d-none');
+
+  if (d.total === 1) {
+    resumen.textContent = 'TEM generado: ' + d.tems[0].tem;
+    if (d.tems[0].imagen_b64) {
+      mostrarPreview('data:image/png;base64,' + d.tems[0].imagen_b64, 'TEM: ' + d.tems[0].tem);
+    }
+    toast('TEM: ' + d.tems[0].tem, 'success', 4000);
+  } else {
+    resumen.textContent = d.total + ' TEMs generados: ' + d.tems[0].tem + ' ... ' + d.tems[d.total-1].tem;
+    toast(d.total + ' TEMs generados', 'success', 4000);
+
+    // Guardar lote en sesion y abrir pagina de impresion
+    // Añadir marca/modelo a cada item antes de guardar
+    const loteConDatos = d.tems.map(item => ({
+      ...item,
+      marca:  document.getElementById('tem-marca').value.trim(),
+      modelo: document.getElementById('tem-modelo').value.trim()
+    }));
+    const r2 = await _fetch('/etiquetas/guardar_lote', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({lote: loteConDatos, mm: parseInt(getMM())})
+    });
+    const d2 = await r2.json();
+    if (d2.ok) {
+      // Abrir en nueva pestaña para imprimir
+      window.open(d2.url + '?print=0', '_blank');
+    }
+  }
+}
+
+function etiquetaManual() {
+  const sn    = document.getElementById('manual-sn').value.trim();
+  const marca = document.getElementById('manual-marca').value.trim();
+  const modelo= document.getElementById('manual-modelo').value.trim();
+  if (!sn) { toast('El S/N es obligatorio', 'warning'); return; }
+  const url = '/etiquetas/generar?icm=' + encodeURIComponent(sn) +
+    '&marca=' + encodeURIComponent(marca) + '&modelo=' + encodeURIComponent(modelo) +
+    '&sn=' + encodeURIComponent(sn) + '&mm=' + getMM();
+  mostrarPreview(url, 'S/N: ' + sn);
+}
+
+function mostrarPreview(url, info) {
+  previewUrl = url;
+  document.getElementById('preview-img').src = url;
+  document.getElementById('preview-info').textContent = info;
+  document.getElementById('preview-zone').classList.remove('d-none');
+  document.getElementById('preview-zone').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function imprimirEtiqueta() {
+  const w = window.open('', '_blank');
+  w.document.write('<html><body style="margin:0;padding:20px;text-align:center">' +
+    '<img src="' + previewUrl + '" style="max-width:100%" onload="window.print()"/>' +
+    '</body></html>');
+  w.document.close();
+}
+
+function descargarPreview() {
+  const a = document.createElement('a');
+  a.href = previewUrl;
+  a.download = 'etiqueta_SISDAH.png';
+  a.click();
+}
+
+// Auto-scan en el campo ICM de equipos existentes
+const inp = document.getElementById('icm-exist');
+let timer;
+inp.addEventListener('input', () => {
+  clearTimeout(timer);
+  if (!inp.value.trim()) return;
+  timer = setTimeout(previsualizarExist, 100);
+});
+inp.addEventListener('keydown', e => {
+  if (e.key==='Enter') { e.preventDefault(); clearTimeout(timer); previsualizarExist(); }
+});
+</script>
+{% endblock %}

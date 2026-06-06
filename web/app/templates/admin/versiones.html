@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Versiones — SISDAH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title">
+    <i class="bi bi-clock-history icon-title"></i> Control de versiones
+    <span class="badge bg-danger ms-2" style="font-size:.65rem;vertical-align:middle;">SOLO DEV</span>
+  </h4>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('admin.seguridad') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-shield-lock me-1"></i> Seguridad
+    </a>
+    <a href="{{ url_for('dashboard.home') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-house me-1"></i> Home
+    </a>
+  </div>
+</div>
+
+{# ── Versión actual ─────────────────────────────────────────────────────── #}
+<div class="card mb-4" style="border-top:4px solid var(--cm-red)">
+  <div class="card-body d-flex align-items-center gap-4 flex-wrap">
+    <div>
+      <div class="text-muted small mb-1">Versión en producción</div>
+      <div class="fw-bold" style="font-size:2.2rem;line-height:1">v{{ version }}</div>
+    </div>
+    <div class="border-start ps-4">
+      <div class="text-muted small mb-1">Nombre de release</div>
+      <div class="fw-semibold fs-5">{{ release }}</div>
+    </div>
+    <div class="border-start ps-4">
+      <div class="text-muted small mb-1">Fecha de build</div>
+      <div class="fw-semibold">{{ build }}</div>
+    </div>
+    <div class="ms-auto">
+      <div class="text-muted small mb-1">Cómo actualizar la versión</div>
+      <code class="small">app/version.py → VERSION = "X.Y.Z"</code>
+    </div>
+  </div>
+</div>
+
+{# ── Guía de versiones ────────────────────────────────────────────────────── #}
+<div class="alert alert-light border mb-4 small">
+  <i class="bi bi-info-circle me-2 text-cm-red"></i>
+  <strong>Convención de versiones:</strong>
+  <span class="ms-2"><strong>MAJOR</strong> — cambio incompatible o rediseño completo</span>
+  <span class="ms-3"><strong>MINOR</strong> — nuevas funcionalidades (compatible)</span>
+  <span class="ms-3"><strong>PATCH</strong> — corrección de bugs</span>
+  <span class="ms-3">Ejemplo: <code>3.1.2</code> = major 3 · minor 1 · patch 2</span>
+</div>
+
+{# ── Changelog ────────────────────────────────────────────────────────────── #}
+{% for entry in changelog %}
+<div class="card mb-3">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <div class="d-flex align-items-center gap-3">
+      <span class="fw-bold font-monospace fs-5">v{{ entry.version }}</span>
+      <span class="fw-semibold text-muted">{{ entry.nombre }}</span>
+      {% if loop.first %}
+        <span class="badge bg-danger">Actual</span>
+      {% endif %}
+    </div>
+    <span class="text-muted small">{{ entry.fecha }}</span>
+  </div>
+  <div class="card-body py-2 px-0">
+    <ul class="list-group list-group-flush">
+      {% for tipo, desc in entry.cambios %}
+      <li class="list-group-item px-3 py-2 d-flex align-items-start gap-2">
+        {# Icono y color por tipo #}
+        {% if tipo == 'security' %}
+          <span class="badge bg-danger flex-shrink-0 mt-1" style="font-size:.7rem;min-width:68px;text-align:center">
+            <i class="bi bi-shield-fill me-1"></i>Seguridad
+          </span>
+        {% elif tipo == 'feature' %}
+          <span class="badge badge-estado-stock flex-shrink-0 mt-1" style="font-size:.7rem;min-width:68px;text-align:center">
+            <i class="bi bi-plus-circle me-1"></i>Feature
+          </span>
+        {% elif tipo == 'fix' %}
+          <span class="badge bg-warning text-dark flex-shrink-0 mt-1" style="font-size:.7rem;min-width:68px;text-align:center">
+            <i class="bi bi-wrench me-1"></i>Fix
+          </span>
+        {% elif tipo == 'breaking' %}
+          <span class="badge bg-dark flex-shrink-0 mt-1" style="font-size:.7rem;min-width:68px;text-align:center">
+            <i class="bi bi-exclamation-triangle me-1"></i>Breaking
+          </span>
+        {% elif tipo == 'perf' %}
+          <span class="badge badge-estado-reservado flex-shrink-0 mt-1" style="font-size:.7rem;min-width:68px;text-align:center">
+            <i class="bi bi-speedometer2 me-1"></i>Mejora
+          </span>
+        {% endif %}
+        <span class="small">{{ desc }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endfor %}
+
+{# ── Instrucciones para publicar nueva versión ────────────────────────────── #}
+<div class="card mt-2" style="border:1px dashed var(--gray-300)">
+  <div class="card-header bg-transparent">
+    <i class="bi bi-terminal me-2 text-cm-red"></i>Cómo publicar una nueva versión
+  </div>
+  <div class="card-body">
+    <ol class="mb-0 small">
+      <li class="mb-2">Abre <code>app/version.py</code></li>
+      <li class="mb-2">Actualiza <code>VERSION</code>, <code>BUILD_DATE</code> y <code>RELEASE_NAME</code></li>
+      <li class="mb-2">Añade una nueva entrada al principio de la lista <code>CHANGELOG</code> con los cambios de esta release</li>
+      <li class="mb-2">Reinicia el servidor — la nueva versión aparece automáticamente en el footer y en esta página</li>
+    </ol>
+    <div class="mt-3 p-3 rounded" style="background:var(--gray-900);color:#a8ff78;font-family:monospace;font-size:.82rem">
+      <div class="text-muted mb-1"># app/version.py</div>
+      <div>VERSION      = <span style="color:#f8c555">"3.2.0"</span></div>
+      <div>BUILD_DATE   = <span style="color:#f8c555">"2026-07-01"</span></div>
+      <div>RELEASE_NAME = <span style="color:#f8c555">"Nombre de la release"</span></div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

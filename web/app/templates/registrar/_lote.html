@@ -1,0 +1,301 @@
+<!-- ══ MODO LOTE ═════════════════════════════════════════════════ -->
+<div id="panel-lote">
+<div class="row g-4">
+
+  <!-- ── Paso 1: Configuración ───────────────────────────────── -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header"><span class="badge bg-cm-red me-2">1</span>Configuración del lote</div>
+      <div class="card-body">
+
+        <div class="mb-3">
+          <label class="form-label">Sección <span class="text-cm-red">*</span></label>
+          <select id="sel-seccion" class="form-select" onchange="cargarMarcas()">
+            <option value="">— Selecciona sección —</option>
+            {% for s in secciones %}
+            <option value="{{ s }}">{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Marca <span class="text-cm-red">*</span></label>
+          <select id="sel-marca" class="form-select" onchange="cargarModelos()" disabled>
+            <option value="">— Elige sección primero —</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Modelo <span class="text-cm-red">*</span></label>
+          <select id="sel-modelo" class="form-select" disabled>
+            <option value="">— Elige marca primero —</option>
+          </select>
+          <div id="modelo-libre-grupo" class="mt-2 d-none">
+            <input type="text" id="inp-modelo-libre" class="form-control"
+                   placeholder="Escribe el modelo manualmente…">
+          </div>
+          <div class="form-check mt-1">
+            <input class="form-check-input" type="checkbox" id="chk-modelo-libre"
+                   onchange="toggleModeloLibre()">
+            <label class="form-check-label text-muted small" for="chk-modelo-libre">
+              Modelo no está en el catálogo
+            </label>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">N.º Pedido <span class="text-muted">(opcional)</span></label>
+          <input type="text" id="inp-pedido" class="form-control" placeholder="PED-2026-001">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Ubicación <span class="text-muted">(opcional)</span></label>
+          <input type="text" id="inp-ubicacion" class="form-control"
+                 placeholder="Ej: Almacén TI · Planta 1">
+          <div class="form-text">Dónde se almacenan estos equipos al entrar</div>
+        </div>
+
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" id="chk-sn">
+          <label class="form-check-label" for="chk-sn">Registrar S/N (Número de serie)</label>
+        </div>
+
+        <div class="alert py-2 small mb-0"
+             style="background:#FFF8E1;border:1px solid #FFE082;color:#795548">
+          <i class="bi bi-info-circle me-1"></i>
+          <strong>Sin ICM de la CM?</strong>
+          <button type="button" class="btn btn-warning btn-sm py-0 ms-2 fw-bold"
+                  onclick="abrirModalTEM()">
+            <i class="bi bi-upc me-1"></i>Generar TEM
+          </button>
+          <div class="mt-1" id="tem-reg-info" style="display:none">
+            TEM asignado: <strong class="font-monospace text-cm-red" id="tem-reg-codigo"></strong>
+            <button class="btn btn-link btn-sm py-0" onclick="verEtiquetaTEM()">Ver etiqueta</button>
+          </div>
+        </div>
+
+        <div id="resumen-config" class="mt-3 d-none">
+          <div class="alert py-2 mb-0 border-0" style="background:#FFF5F6">
+            <small class="text-muted">Registrando:</small><br>
+            <strong class="text-cm-red" id="resumen-texto"></strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Paso 2: Añadir equipos ──────────────────────────────── -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><span class="badge bg-cm-red me-2">2</span><span id="paso2-titulo">Añadir equipos</span></span>
+        <div class="btn-group btn-group-sm" role="group" id="toggle-modo">
+          <button type="button" class="btn btn-outline-secondary active" id="btn-modo-manual"
+                  onclick="setModoEntrada('manual')" title="Teclado o pistola escáner">
+            <i class="bi bi-keyboard"></i>
+          </button>
+          <button type="button" class="btn btn-outline-secondary" id="btn-modo-camara"
+                  onclick="setModoEntrada('camara')" title="Escanear con cámara">
+            <i class="bi bi-camera"></i>
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+
+        <!-- ── Modo teléfono (cuando sección = TELÉFONOS) ─────── -->
+        <div id="panel-tel-entrada" class="d-none">
+          <div class="mb-3">
+            <label class="form-label" for="tel-lote-ns">N.º de serie (NS) <span class="text-cm-red">*</span></label>
+            <input type="text" id="tel-lote-ns" class="form-control font-monospace"
+                   placeholder="FCH1234ABCD" autocomplete="off"
+                   oninput="this.value=this.value.toUpperCase()">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="tel-lote-mac">MAC address <span class="text-cm-red">*</span></label>
+            <input type="text" id="tel-lote-mac" class="form-control font-monospace"
+                   placeholder="AA:BB:CC:DD:EE:FF" autocomplete="off"
+                   oninput="telLoteFormatMAC(this)">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="tel-lote-ip">IP <span class="text-muted small">(opcional)</span></label>
+            <input type="text" id="tel-lote-ip" class="form-control font-monospace"
+                   placeholder="10.0.0.1" autocomplete="off">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="tel-lote-ubi">Ubicación física <span class="text-muted small">(opcional)</span></label>
+            <input type="text" id="tel-lote-ubi" class="form-control"
+                   placeholder="Ej: Planta 3 · Consulta 12">
+          </div>
+          <button class="btn btn-cm-red w-100" onclick="telLoteAnadir()">
+            <i class="bi bi-plus-lg me-1"></i>Añadir a la lista
+          </button>
+          <p class="text-muted small text-center mt-2 mb-0">
+            <i class="bi bi-info-circle me-1"></i>Al menos NS o MAC son obligatorios
+          </p>
+        </div>
+
+        <!-- Modo manual / pistola -->
+        <div id="panel-manual">
+          <div class="mb-3">
+            <label class="form-label">ICM</label>
+            <input type="text" id="inp-icm"
+                   class="form-control form-control-lg text-center font-monospace"
+                   placeholder="Escanea o escribe el ICM" autocomplete="off">
+            <div id="icm-feedback" class="form-text mt-1">&nbsp;</div>
+          </div>
+          <div id="sn-group" class="mb-3 d-none">
+            <label class="form-label">S/N (Número de serie)</label>
+            <input type="text" id="inp-sn"
+                   class="form-control form-control-lg text-center font-monospace"
+                   placeholder="Escanea el S/N" autocomplete="off">
+          </div>
+          <button class="btn btn-cm-red w-100" onclick="registrarICM()">
+            <i class="bi bi-plus-lg me-1"></i>Añadir a la lista
+          </button>
+          <p class="text-muted small text-center mt-2 mb-0">
+            <i class="bi bi-info-circle me-1"></i>La pistola avanza automáticamente
+          </p>
+        </div>
+
+        <!-- Modo cámara -->
+        <div id="panel-camara" class="d-none">
+          <div class="position-relative mb-3" id="camara-container"
+               style="background:#000;border-radius:8px;overflow:hidden;aspect-ratio:4/3">
+            <video id="camara-video" class="w-100 h-100"
+                   style="object-fit:cover" autoplay muted playsinline></video>
+            <div id="scan-frame"
+                 style="position:absolute;inset:0;display:flex;align-items:center;
+                        justify-content:center;pointer-events:none">
+              <div style="width:65%;aspect-ratio:3/1.2;border:2px solid rgba(200,16,46,.9);
+                          border-radius:6px;box-shadow:0 0 0 999px rgba(0,0,0,.35);position:relative">
+                <span style="position:absolute;top:-2px;left:-2px;width:16px;height:16px;
+                             border-top:3px solid #C8102E;border-left:3px solid #C8102E;border-radius:2px 0 0 0"></span>
+                <span style="position:absolute;top:-2px;right:-2px;width:16px;height:16px;
+                             border-top:3px solid #C8102E;border-right:3px solid #C8102E;border-radius:0 2px 0 0"></span>
+                <span style="position:absolute;bottom:-2px;left:-2px;width:16px;height:16px;
+                             border-bottom:3px solid #C8102E;border-left:3px solid #C8102E;border-radius:0 0 0 2px"></span>
+                <span style="position:absolute;bottom:-2px;right:-2px;width:16px;height:16px;
+                             border-bottom:3px solid #C8102E;border-right:3px solid #C8102E;border-radius:0 0 2px 0"></span>
+                <div id="scan-line"
+                     style="position:absolute;left:4px;right:4px;height:2px;
+                            background:linear-gradient(90deg,transparent,#C8102E,transparent);
+                            animation:scanline 1.8s ease-in-out infinite"></div>
+              </div>
+            </div>
+            <div id="camara-estado"
+                 style="position:absolute;bottom:0;left:0;right:0;
+                        background:linear-gradient(transparent,rgba(0,0,0,.7));
+                        padding:.5rem .75rem;color:#fff;font-size:.78rem;text-align:center">
+              <i class="bi bi-camera me-1"></i>Apunta el código al recuadro rojo
+            </div>
+            <div id="scan-flash"
+                 style="position:absolute;inset:0;background:rgba(200,16,46,.15);
+                        opacity:0;pointer-events:none;border-radius:8px;transition:opacity 80ms"></div>
+          </div>
+
+          <div id="sn-group-camara" class="mb-3 d-none">
+            <label class="form-label small fw-semibold">S/N detectado / escribe:</label>
+            <input type="text" id="inp-sn-camara"
+                   class="form-control text-center font-monospace"
+                   placeholder="S/N (opcional)" autocomplete="off">
+          </div>
+
+          <div id="camara-icm-panel" class="d-none mb-3">
+            <div class="d-flex align-items-center gap-2 p-2 rounded"
+                 style="background:var(--cm-red-light);border:1px solid rgba(200,16,46,.2)">
+              <i class="bi bi-check-circle-fill text-cm-red"></i>
+              <span class="font-monospace fw-bold text-cm-red" id="camara-icm-val"></span>
+              <button class="btn btn-link btn-sm py-0 ms-auto text-muted"
+                      onclick="limpiarScan()">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+          </div>
+
+          <button class="btn btn-cm-red w-100" id="btn-camara-add"
+                  onclick="registrarICMCamara()" disabled>
+            <i class="bi bi-plus-lg me-1"></i>Añadir a la lista
+          </button>
+
+          <div id="camara-no-soporte" class="d-none mt-2">
+            <div class="alert alert-warning small mb-0">
+              <i class="bi bi-exclamation-triangle me-1"></i>
+              Tu navegador no soporta escáner de cámara.
+              Usa <strong>Chrome 88+</strong> o Edge moderno.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Paso 3: Pendientes ───────────────────────────────────── -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><span class="badge bg-cm-red me-2">3</span>Pendientes</span>
+        <span class="badge bg-cm-red" id="badge-count">0</span>
+      </div>
+      <div class="card-body p-0" style="max-height:320px;overflow-y:auto">
+        <ul id="lista-pendientes" class="list-group list-group-flush">
+          <li class="list-group-item text-center text-muted small py-4">Sin equipos aún</li>
+        </ul>
+      </div>
+      <div class="card-footer">
+        <button class="btn btn-cm-red w-100 fw-bold" onclick="finalizar()"
+                id="btn-finalizar" disabled>
+          <i class="bi bi-check-circle me-1"></i>Finalizar y guardar
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal: Generar TEM -->
+<div class="modal fade" id="modalTEM" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header border-0" style="background:#FFF8E1">
+        <h5 class="modal-title fw-bold" style="color:#795548">
+          <i class="bi bi-upc me-2"></i>Generar ICM Temporal (TEM)
+        </h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">
+          Para equipos que llegan sin ICM asignado por la Comunidad de Madrid.
+          Se genera un código TEM único de 8 dígitos que no se repetirá nunca.
+        </p>
+        <div class="mb-2">
+          <label class="form-label">S/N del equipo <span class="text-muted">(opcional)</span></label>
+          <div class="input-group">
+            <span class="input-group-text bg-cm-red text-white border-cm-red">
+              <i class="bi bi-upc-scan"></i>
+            </span>
+            <input type="text" id="tem-modal-sn"
+                   class="form-control form-control-lg font-monospace text-center"
+                   placeholder="Escanea o escribe el S/N" autocomplete="off">
+          </div>
+          <div class="form-text">El Enter del escáner avanza automáticamente</div>
+        </div>
+        <div id="tem-modal-preview" class="d-none mt-3 text-center">
+          <img id="tem-modal-img" src="" alt="Etiqueta TEM"
+               style="max-width:100%;border:1px solid #ddd;border-radius:4px">
+          <div class="mt-2">
+            <strong class="font-monospace text-cm-red fs-5" id="tem-modal-codigo"></strong>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-warning text-dark fw-bold" onclick="confirmarTEM()">
+          <i class="bi bi-upc me-1"></i>Generar TEM + etiqueta
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>{# /panel-lote #}

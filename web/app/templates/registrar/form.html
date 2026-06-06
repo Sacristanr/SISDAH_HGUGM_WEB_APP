@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Registrar material{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-plus-circle icon-title"></i>Registrar nuevo material</h4>
+  <!-- Selector de modo global -->
+  <div class="btn-group" role="group">
+    <button class="btn btn-cm-red btn-sm active" id="btn-modo-lote" onclick="setModoGlobal('lote')">
+      <i class="bi bi-upc-scan me-1"></i>Lote / Escáner
+    </button>
+    <button class="btn btn-outline-secondary btn-sm" id="btn-modo-individual" onclick="setModoGlobal('individual')">
+      <i class="bi bi-pencil-square me-1"></i>Individual
+    </button>
+  </div>
+</div>
+
+{# ── Paneles HTML ─────────────────────────────────────────── #}
+{% include 'registrar/_individual.html' %}
+{% include 'registrar/_lote.html' %}
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+@keyframes scanline {
+  0%   { top: 6px;              opacity: 1; }
+  50%  {                        opacity: .6; }
+  100% { top: calc(100% - 8px); opacity: 1; }
+}
+</style>
+
+{# ── Scripts en orden de dependencia ─────────────────────── #}
+{# 1. Comunes: pendientes[], setModoGlobal, actualizarLista, finalizar #}
+{% include 'registrar/_scripts_comun.html' %}
+
+{# 2. Lote: cargarMarcas/Modelos, escáner, cámara, TEM #}
+{% include 'registrar/_scripts_lote.html' %}
+
+{# 3. Individual: indCargarMarcas/Modelos, guardarIndividual #}
+{% include 'registrar/_scripts_individual.html' %}
+{% endblock %}

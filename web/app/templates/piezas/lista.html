@@ -1,0 +1,457 @@
+{% extends "base.html" %}
+{% block title %}Piezas y complementos{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-tools icon-title"></i>Piezas y complementos</h4>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-3" id="tabs">
+  <li class="nav-item">
+    <a class="nav-link active" href="#" onclick="switchTab('piezas');return false">
+      <i class="bi bi-tools me-1"></i>Piezas de repuesto
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="#" onclick="switchTab('complementos');return false">
+      <i class="bi bi-mouse me-1"></i>Complementos
+    </a>
+  </li>
+</ul>
+
+<!-- ── PIEZAS ──────────────────────────────────────────────── -->
+<div id="tab-piezas">
+  {% if current_user.es_gestor %}
+  <div class="d-flex justify-content-end mb-2">
+    <button class="btn btn-cm-red btn-sm" onclick="abrirModalPieza()">
+      <i class="bi bi-plus-circle me-1"></i>Nueva pieza
+    </button>
+  </div>
+  {% endif %}
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm mb-0 align-middle">
+        <thead>
+          <tr>
+            <th class="ps-3">Nombre</th>
+            <th>Referencia</th>
+            <th>Stock</th>
+            <th>Ubicación</th>
+            <th>Compatible con</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in piezas %}
+          <tr id="pie-{{ p.id }}">
+            <td class="ps-3 fw-semibold">{{ p.nombre }}</td>
+            <td class="font-monospace small">{{ p.referencia or '—' }}</td>
+            <td>
+              <span class="badge {% if p.cantidad == 0 %}bg-danger{% elif p.cantidad <= 2 %}bg-warning text-dark{% elif p.cantidad <= 5 %}bg-info text-dark{% else %}badge-estado-stock{% endif %}">
+                {{ p.cantidad }}
+              </span>
+            </td>
+            <td class="small">{{ p.ubicacion or '—' }}</td>
+            <td class="small text-muted">{{ p.compatible or '—' }}</td>
+            <td>
+              <div class="d-flex gap-1">
+                <button class="btn btn-outline-cm-red btn-sm btn-retirar"
+                        data-tipo="pieza"
+                        data-id="{{ p.id }}"
+                        data-nombre="{{ p.nombre|e }}"
+                        data-stock="{{ p.cantidad }}"
+                        {% if p.cantidad == 0 %}disabled title="Sin stock"{% else %}title="Retirar"{% endif %}>
+                  <i class="bi bi-box-arrow-right"></i>
+                </button>
+                {% if current_user.es_gestor %}
+                <button class="btn btn-outline-secondary btn-sm py-0"
+                        onclick='editarPieza({{ p.to_dict()|tojson }})'>
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-outline-danger btn-sm py-0"
+                        onclick="eliminarPieza({{ p.id }})">
+                  <i class="bi bi-trash"></i>
+                </button>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-4">Sin piezas registradas</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── COMPLEMENTOS ────────────────────────────────────────── -->
+<div id="tab-complementos" class="d-none">
+  {% if current_user.es_gestor %}
+  <div class="d-flex justify-content-end mb-2">
+    <button class="btn btn-cm-red btn-sm" onclick="abrirModalComp()">
+      <i class="bi bi-plus-circle me-1"></i>Nuevo complemento
+    </button>
+  </div>
+  {% endif %}
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm mb-0 align-middle">
+        <thead>
+          <tr>
+            <th class="ps-3">Tipo</th>
+            <th>Marca / Modelo</th>
+            <th>Stock</th>
+            <th>Estado</th>
+            <th>ICM asociado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in complementos %}
+          <tr id="comp-{{ c.id }}">
+            <td class="ps-3">
+              <span class="badge bg-light text-dark border">{{ c.tipo or '—' }}</span>
+            </td>
+            <td>{{ c.marca or '' }} {{ c.modelo or '' }}</td>
+            <td>
+              <span class="badge {% if c.cantidad == 0 %}bg-danger{% elif c.cantidad <= 2 %}bg-warning text-dark{% else %}badge-estado-stock{% endif %}">
+                {{ c.cantidad }}
+              </span>
+            </td>
+            <td>
+              <span class="badge bg-light text-dark border">{{ c.estado }}</span>
+            </td>
+            <td class="font-monospace small">
+              {% if c.icm_asociado %}
+                <a href="{{ url_for('inventario.detalle', icm=c.icm_asociado) }}" class="text-cm-red">
+                  {{ c.icm_asociado }}
+                </a>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                <button class="btn btn-outline-cm-red btn-sm btn-retirar"
+                        data-tipo="complemento"
+                        data-id="{{ c.id }}"
+                        data-nombre="{{ (c.tipo ~ ' ' ~ (c.marca or ''))|e }}"
+                        data-stock="{{ c.cantidad }}"
+                        {% if c.cantidad == 0 %}disabled title="Sin stock"{% else %}title="Retirar"{% endif %}>
+                  <i class="bi bi-box-arrow-right"></i>
+                </button>
+                {% if current_user.es_gestor %}
+                <button class="btn btn-outline-secondary btn-sm py-0"
+                        onclick='editarComp({{ c.to_dict()|tojson }})'>
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-outline-danger btn-sm py-0"
+                        onclick="eliminarComp({{ c.id }})">
+                  <i class="bi bi-trash"></i>
+                </button>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-4">Sin complementos registrados</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL RETIRADA (técnicos y gestores) ───────────────── -->
+<div class="modal fade" id="modalRetirada" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header border-0" style="background:var(--cm-red-light)">
+        <h5 class="modal-title fw-bold text-cm-red">
+          <i class="bi bi-box-arrow-right me-2"></i>Retirar
+        </h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="ret-tipo">
+        <input type="hidden" id="ret-id">
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold text-muted small">ARTÍCULO</label>
+          <div id="ret-nombre" class="fw-bold"></div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Técnico</label>
+          <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-3"
+               style="background:var(--success-light);border:1.5px solid rgba(18,183,106,.25)">
+            <i class="bi bi-person-check-fill text-success"></i>
+            <span class="font-monospace fw-bold">{{ current_user.dni }}</span>
+            <span class="text-muted small ms-1">{{ current_user.nombre }}</span>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Cantidad <span class="text-cm-red">*</span></label>
+          <div class="d-flex align-items-center gap-2">
+            <input type="number" id="ret-cant" class="form-control" value="1" min="1" style="width:90px">
+            <span class="text-muted small" id="ret-stock-info"></span>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Destino / Equipo <span class="text-muted">(opcional)</span></label>
+          <input type="text" id="ret-destino" class="form-control font-monospace"
+                 placeholder="ICM o ubicación">
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label">Motivo <span class="text-muted">(opcional)</span></label>
+          <input type="text" id="ret-motivo" class="form-control"
+                 placeholder="Ej: sustitución, asignación…">
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-cm-red fw-bold" onclick="confirmarRetirada()">
+          <i class="bi bi-check-circle me-1"></i>Confirmar retirada
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if current_user.es_gestor %}
+<!-- Modal pieza (solo gestores) -->
+<div class="modal fade" id="modalPieza" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header border-0"><h5 class="modal-title fw-bold">Pieza de repuesto</h5>
+      <button class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="pie-id">
+      <div class="row g-2">
+        <div class="col-8"><label class="form-label">Nombre *</label><input id="pie-nom" class="form-control"></div>
+        <div class="col-4"><label class="form-label">Cantidad</label><input id="pie-cant" type="number" class="form-control" value="0" min="0"></div>
+        <div class="col-6"><label class="form-label">Referencia</label><input id="pie-ref" class="form-control font-monospace"></div>
+        <div class="col-6"><label class="form-label">Ubicación</label><input id="pie-ubi" class="form-control"></div>
+        <div class="col-12"><label class="form-label">Compatible con</label><input id="pie-com" class="form-control" placeholder="ThinkPad L14, ProBook 450…"></div>
+        <div class="col-12"><label class="form-label">Notas</label><textarea id="pie-not" class="form-control" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer border-0">
+      <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+      <button class="btn btn-cm-red" onclick="guardarPieza()"><i class="bi bi-check-circle me-1"></i>Guardar</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- Modal complemento (solo gestores) -->
+<div class="modal fade" id="modalComp" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header border-0"><h5 class="modal-title fw-bold">Complemento</h5>
+      <button class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="comp-id">
+      <div class="row g-2">
+        <div class="col-6"><label class="form-label">Tipo</label>
+          <select id="comp-tipo" class="form-select">
+            <option>teclado</option><option>ratón</option><option>monitor</option>
+            <option>cable</option><option>auriculares</option><option>webcam</option><option>otro</option>
+          </select></div>
+        <div class="col-6"><label class="form-label">Marca</label><input id="comp-marca" class="form-control"></div>
+        <div class="col-6"><label class="form-label">Modelo</label><input id="comp-modelo" class="form-control"></div>
+        <div class="col-3"><label class="form-label">Cantidad</label><input id="comp-cant" type="number" class="form-control" value="1" min="0"></div>
+        <div class="col-3"><label class="form-label">Estado</label>
+          <select id="comp-est" class="form-select">
+            <option value="en stock">En stock</option>
+            <option value="asignado">Asignado</option>
+            <option value="averia">Avería</option>
+          </select></div>
+        <div class="col-12"><label class="form-label">ICM asociado</label>
+          <input id="comp-icm" class="form-control font-monospace" placeholder="Dejar vacío si no aplica"></div>
+        <div class="col-12"><label class="form-label">Notas</label>
+          <textarea id="comp-not" class="form-control" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer border-0">
+      <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+      <button class="btn btn-cm-red" onclick="guardarComp()"><i class="bi bi-check-circle me-1"></i>Guardar</button>
+    </div>
+  </div></div>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+// ── Tabs ─────────────────────────────────────────────────────
+function switchTab(t) {
+  document.getElementById('tab-piezas').classList.toggle('d-none', t !== 'piezas');
+  document.getElementById('tab-complementos').classList.toggle('d-none', t !== 'complementos');
+  document.querySelectorAll('#tabs .nav-link').forEach((l, i) => {
+    l.classList.toggle('active', (i === 0 && t === 'piezas') || (i === 1 && t === 'complementos'));
+  });
+}
+
+// ── Retirada ─────────────────────────────────────────────────
+let _modalRetirada = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  // 1. Inicializar modal DESPUÉS de que base.html lo movió a <body>
+  const el = document.getElementById('modalRetirada');
+  if (el) _modalRetirada = new bootstrap.Modal(el);
+
+  // 2. Listener delegado en document — evita problema de onclick con comillas
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.btn-retirar');
+    if (!btn || btn.disabled) return;
+    const { tipo, id, nombre, stock } = btn.dataset;
+    abrirRetirada(tipo, id, nombre, parseInt(stock));
+  });
+});
+
+function abrirRetirada(tipo, id, nombre, stock) {
+  if (!_modalRetirada) { toast('Error interno: modal no listo', 'danger'); return; }
+  document.getElementById('ret-tipo').value             = tipo;
+  document.getElementById('ret-id').value               = id;
+  document.getElementById('ret-nombre').textContent     = nombre;
+  document.getElementById('ret-cant').value             = 1;
+  document.getElementById('ret-cant').max               = stock;
+  document.getElementById('ret-stock-info').textContent = `(máx. ${stock})`;
+  document.getElementById('ret-destino').value          = '';
+  document.getElementById('ret-motivo').value           = '';
+  _modalRetirada.show();
+  setTimeout(() => document.getElementById('ret-cant').focus(), 300);
+}
+
+async function confirmarRetirada() {
+  const tipo    = document.getElementById('ret-tipo').value;
+  const id      = document.getElementById('ret-id').value;
+  const cant    = parseInt(document.getElementById('ret-cant').value);
+  const destino = document.getElementById('ret-destino').value.trim();
+  const motivo  = document.getElementById('ret-motivo').value.trim();
+
+  if (!cant || cant < 1) { toast('Introduce una cantidad válida', 'warning'); return; }
+
+  const url = tipo === 'pieza'
+    ? `/piezas/retirar_pieza/${id}`
+    : `/piezas/retirar_complemento/${id}`;
+
+  try {
+    const r = await _fetch(url, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({cantidad: cant, destino, motivo})
+    });
+    if (!r.ok && r.status !== 200) {
+      const txt = await r.text();
+      console.error('Respuesta del servidor:', txt);
+      toast(`Error del servidor (${r.status})`, 'danger');
+      return;
+    }
+    const d = await r.json();
+    if (d.ok) {
+      _modalRetirada.hide();
+      toast(`Retirada registrada. Stock restante: ${d.stock_restante}`, 'success', 4000);
+      setTimeout(() => location.reload(), 1200);
+    } else {
+      toast('Error: ' + d.error, 'danger');
+    }
+  } catch (err) {
+    console.error('confirmarRetirada error:', err);
+    toast('Error de red o servidor. Revisa la consola.', 'danger');
+  }
+}
+
+{% if current_user.es_gestor %}
+// ── Gestión piezas (solo gestores) ───────────────────────────
+let modalPieza, modalComp;
+document.addEventListener('DOMContentLoaded', () => {
+  modalPieza = new bootstrap.Modal(document.getElementById('modalPieza'));
+  modalComp  = new bootstrap.Modal(document.getElementById('modalComp'));
+});
+
+function abrirModalPieza() {
+  ['pie-id','pie-nom','pie-ref','pie-ubi','pie-com','pie-not'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pie-cant').value = 0;
+  modalPieza.show();
+}
+function editarPieza(p) {
+  document.getElementById('pie-id').value  = p.id;
+  document.getElementById('pie-nom').value = p.nombre || '';
+  document.getElementById('pie-ref').value = p.referencia || '';
+  document.getElementById('pie-cant').value= p.cantidad || 0;
+  document.getElementById('pie-ubi').value = p.ubicacion || '';
+  document.getElementById('pie-com').value = p.compatible || '';
+  document.getElementById('pie-not').value = p.notas || '';
+  modalPieza.show();
+}
+async function guardarPieza() {
+  const r = await _fetch('/piezas/guardar_pieza', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      id:         document.getElementById('pie-id').value || null,
+      nombre:     document.getElementById('pie-nom').value,
+      referencia: document.getElementById('pie-ref').value,
+      cantidad:   document.getElementById('pie-cant').value,
+      ubicacion:  document.getElementById('pie-ubi').value,
+      compatible: document.getElementById('pie-com').value,
+      notas:      document.getElementById('pie-not').value
+    })
+  });
+  const d = await r.json();
+  if (d.ok) { modalPieza.hide(); location.reload(); }
+  else toast('Error: ' + d.error, 'danger');
+}
+async function eliminarPieza(id) {
+  if (!await sisdahConfirm('¿Eliminar esta pieza del inventario?', {title:'Eliminar pieza', btnText:'Eliminar'})) return;
+  const r = await _fetch(`/piezas/eliminar_pieza/${id}`, {method:'POST'});
+  const d = await r.json();
+  if (d.ok) document.getElementById(`pie-${id}`).remove();
+}
+
+function abrirModalComp() {
+  ['comp-id','comp-marca','comp-modelo','comp-icm','comp-not'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('comp-cant').value = 1;
+  modalComp.show();
+}
+function editarComp(c) {
+  document.getElementById('comp-id').value    = c.id;
+  document.getElementById('comp-tipo').value  = c.tipo || 'teclado';
+  document.getElementById('comp-marca').value = c.marca || '';
+  document.getElementById('comp-modelo').value= c.modelo || '';
+  document.getElementById('comp-cant').value  = c.cantidad || 1;
+  document.getElementById('comp-est').value   = c.estado || 'en stock';
+  document.getElementById('comp-icm').value   = c.icm_asociado || '';
+  document.getElementById('comp-not').value   = c.notas || '';
+  modalComp.show();
+}
+async function guardarComp() {
+  const r = await _fetch('/piezas/guardar_complemento', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      id:           document.getElementById('comp-id').value || null,
+      tipo:         document.getElementById('comp-tipo').value,
+      marca:        document.getElementById('comp-marca').value,
+      modelo:       document.getElementById('comp-modelo').value,
+      cantidad:     document.getElementById('comp-cant').value,
+      estado:       document.getElementById('comp-est').value,
+      icm_asociado: document.getElementById('comp-icm').value,
+      notas:        document.getElementById('comp-not').value
+    })
+  });
+  const d = await r.json();
+  if (d.ok) { modalComp.hide(); location.reload(); }
+  else toast('Error: ' + d.error, 'danger');
+}
+async function eliminarComp(id) {
+  if (!await sisdahConfirm('¿Eliminar este complemento?', {title:'Eliminar complemento', btnText:'Eliminar'})) return;
+  const r = await _fetch(`/piezas/eliminar_complemento/${id}`, {method:'POST'});
+  const d = await r.json();
+  if (d.ok) document.getElementById(`comp-${id}`).remove();
+}
+{% endif %}
+</script>
+{% endblock %}

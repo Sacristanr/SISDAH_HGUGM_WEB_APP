@@ -1,0 +1,121 @@
+<script>
+// ═══════════════════════════════════════════════════════════════
+// SCRIPTS MODO INDIVIDUAL — cascada, guardar equipo único
+// ═══════════════════════════════════════════════════════════════
+
+// ── Cascada sección → marca → modelo ─────────────────────────
+async function indCargarMarcas() {
+  const sec    = document.getElementById('ind-seccion').value;
+  const selM   = document.getElementById('ind-marca');
+  const selMod = document.getElementById('ind-modelo');
+
+  selM.innerHTML = '<option value="">Cargando…</option>';
+  selM.disabled  = true;
+  selMod.innerHTML = '<option value="">— Elige marca primero —</option>';
+  selMod.disabled  = true;
+
+  if (!sec) { selM.innerHTML = '<option value="">— Elige sección primero —</option>'; return; }
+
+  const r = await _fetch('/registrar/api/marcas?seccion=' + encodeURIComponent(sec));
+  const marcas = await r.json();
+
+  selM.innerHTML = '<option value="">— Selecciona marca —</option>';
+  marcas.forEach(m => {
+    const o = document.createElement('option');
+    o.value = o.textContent = m;
+    selM.appendChild(o);
+  });
+  selM.disabled = false;
+}
+
+async function indCargarModelos() {
+  const sec    = document.getElementById('ind-seccion').value;
+  const marc   = document.getElementById('ind-marca').value;
+  const selMod = document.getElementById('ind-modelo');
+
+  selMod.innerHTML = '<option value="">Cargando…</option>';
+  selMod.disabled  = true;
+
+  if (!marc) { selMod.innerHTML = '<option value="">— Elige marca primero —</option>'; return; }
+
+  const r = await _fetch('/registrar/api/modelos?seccion=' + encodeURIComponent(sec)
+                        + '&marca=' + encodeURIComponent(marc));
+  const modelos = await r.json();
+
+  selMod.innerHTML = '<option value="">— Selecciona modelo —</option>';
+  modelos.forEach(m => {
+    const o = document.createElement('option');
+    o.value = o.textContent = m;
+    selMod.appendChild(o);
+  });
+  selMod.disabled = false;
+}
+
+function indToggleModeloLibre() {
+  const libre = document.getElementById('ind-chk-modelo-libre').checked;
+  document.getElementById('ind-modelo-libre-grupo').classList.toggle('d-none', !libre);
+  document.getElementById('ind-modelo').disabled = libre;
+  if (!libre) document.getElementById('ind-modelo-libre').value = '';
+}
+
+function indGetModelo() {
+  if (document.getElementById('ind-chk-modelo-libre').checked)
+    return document.getElementById('ind-modelo-libre').value.trim().toUpperCase();
+  return document.getElementById('ind-modelo').value;
+}
+
+// ── Guardar equipo individual ─────────────────────────────────
+async function guardarIndividual() {
+  const icm     = document.getElementById('ind-icm').value.trim().toUpperCase();
+  const seccion = document.getElementById('ind-seccion').value;
+  const marca   = document.getElementById('ind-marca').value;
+  const modelo  = indGetModelo();
+  const fb      = document.getElementById('ind-feedback');
+
+  if (!icm)     { fb.className = 'text-danger'; fb.textContent = '⚠ El ICM es obligatorio'; return; }
+  if (!seccion) { fb.className = 'text-danger'; fb.textContent = '⚠ Selecciona una sección'; return; }
+  if (!marca)   { fb.className = 'text-danger'; fb.textContent = '⚠ Selecciona una marca'; return; }
+  if (!modelo)  { fb.className = 'text-danger'; fb.textContent = '⚠ Selecciona o escribe un modelo'; return; }
+
+  fb.className = 'text-muted'; fb.textContent = 'Guardando…';
+
+  const res = await _fetch('/registrar/guardar', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      items: [{ icm, sn: document.getElementById('ind-sn').value.trim() }],
+      numero_pedido : document.getElementById('ind-pedido').value.trim(),
+      marca, modelo, seccion,
+      estado    : document.getElementById('ind-estado').value,
+      ubicacion : document.getElementById('ind-ubicacion').value.trim(),
+      garantia  : document.getElementById('ind-garantia').value,
+      ticket    : document.getElementById('ind-ticket').value.trim(),
+      notas     : document.getElementById('ind-notas').value.trim()
+    })
+  });
+  const d = await res.json();
+
+  if (d.ok) {
+    if (d.duplicados?.length) {
+      fb.className = 'text-warning';
+      fb.textContent = '⚠ ' + icm + ' ya existe en el inventario';
+    } else if (d.guardados?.length) {
+      fb.className = 'text-success';
+      fb.textContent = '✓ ' + icm + ' registrado correctamente';
+      toast('✓ ' + icm + ' guardado', 'success', 2500);
+      // Limpiar campos para el siguiente registro
+      ['ind-icm','ind-sn','ind-pedido','ind-notas','ind-ubicacion','ind-ticket','ind-garantia']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      document.getElementById('ind-icm').focus();
+    }
+  } else {
+    fb.className = 'text-danger';
+    fb.textContent = 'Error: ' + (d.error || 'desconocido');
+    toast('Error al guardar', 'danger');
+  }
+}
+
+// ── Enviar con Enter en el campo ICM individual ───────────────
+document.getElementById('ind-icm').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('ind-sn').focus(); }
+});
+</script>

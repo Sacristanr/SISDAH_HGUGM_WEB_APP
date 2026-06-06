@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Búsqueda: {{ q }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-search icon-title"></i>
+    Resultados para <em>"{{ q }}"</em>
+  </h4>
+  <span class="text-muted small">
+    {{ equipos|length + movimientos|length + telefonos|length + licencias|length }} resultados
+  </span>
+</div>
+
+{% if not q %}
+<div class="alert alert-light border text-center py-5">
+  <i class="bi bi-search fs-1 text-muted d-block mb-2"></i>
+  Escribe algo en la barra de búsqueda de la parte superior
+</div>
+{% else %}
+
+<!-- Equipos -->
+{% if equipos %}
+<div class="card mb-3">
+  <div class="card-header">
+    <i class="bi bi-pc-display me-2 text-cm-red"></i>Equipos
+    <span class="badge bg-cm-red ms-1">{{ equipos|length }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0">
+      <thead><tr><th class="ps-3">ICM</th><th>Marca/Modelo</th><th>Sección</th><th>Estado</th><th>S/N</th><th></th></tr></thead>
+      <tbody>
+        {% for eq in equipos %}
+        <tr>
+          <td class="ps-3 font-monospace fw-bold text-cm-red">{{ eq.icm }}</td>
+          <td>{{ eq.marca or '' }} {{ eq.modelo or '' }}</td>
+          <td><span class="badge bg-light text-dark border">{{ eq.seccion or '—' }}</span></td>
+          <td>
+            {% if eq.estado=='en stock' %}<span class="badge badge-estado-stock">stock</span>
+            {% elif eq.estado=='retirado' %}<span class="badge badge-estado-retirado">retirado</span>
+            {% elif eq.estado=='averia' %}<span class="badge badge-estado-averia">avería</span>
+            {% else %}<span class="badge bg-light text-dark border">{{ eq.estado }}</span>{% endif %}
+          </td>
+          <td class="font-monospace small">{{ eq.sn or '—' }}</td>
+          <td><a href="{{ url_for('inventario.detalle', icm=eq.icm) }}" class="btn btn-outline-cm-red btn-sm py-0">Ver</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Movimientos -->
+{% if movimientos %}
+<div class="card mb-3">
+  <div class="card-header">
+    <i class="bi bi-clock-history me-2 text-cm-red"></i>Movimientos
+    <span class="badge bg-cm-red ms-1">{{ movimientos|length }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0">
+      <thead><tr><th class="ps-3">Fecha</th><th>ICM</th><th>Tipo</th><th>Usuario</th><th>Descripción</th></tr></thead>
+      <tbody>
+        {% for m in movimientos %}
+        <tr>
+          <td class="ps-3 small text-muted">{{ m.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td>{% if m.icm in ('AUTH','ADMIN') %}<span class="font-monospace text-muted fw-bold">{{ m.icm }}</span>{% else %}<a href="{{ url_for('inventario.detalle', icm=m.icm) }}" class="text-cm-red font-monospace">{{ m.icm }}</a>{% endif %}</td>
+          <td><span class="badge bg-light text-dark border">{{ m.tipo }}</span></td>
+          <td class="font-monospace small">{{ m.usuario_dni or '—' }}</td>
+          <td class="small text-muted">{{ m.descripcion or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Teléfonos -->
+{% if telefonos %}
+<div class="card mb-3">
+  <div class="card-header">
+    <i class="bi bi-telephone me-2 text-cm-red"></i>Teléfonos
+    <span class="badge bg-cm-red ms-1">{{ telefonos|length }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0">
+      <thead><tr><th class="ps-3">Extensión</th><th>Modelo</th><th>Sección</th><th>Ubicación</th></tr></thead>
+      <tbody>
+        {% for t in telefonos %}
+        <tr>
+          <td class="ps-3 font-monospace fw-bold text-cm-red">{{ t.extension }}</td>
+          <td>{{ t.modelo or '—' }}</td>
+          <td><span class="badge bg-light text-dark border">{{ t.seccion or '—' }}</span></td>
+          <td class="small">{{ t.ubicacion or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Sin resultados -->
+{% if not equipos and not movimientos and not telefonos and not licencias %}
+<div class="alert alert-light border text-center py-5">
+  <i class="bi bi-search fs-1 text-muted d-block mb-2"></i>
+  <strong>Sin resultados para "{{ q }}"</strong>
+  <p class="text-muted mb-0 mt-1 small">Prueba con el ICM completo, S/N, nombre del técnico o modelo</p>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

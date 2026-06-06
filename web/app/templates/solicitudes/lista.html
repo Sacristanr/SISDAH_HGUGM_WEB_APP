@@ -1,0 +1,425 @@
+{% extends "base.html" %}
+{% block title %}Solicitudes{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title">
+    <i class="bi bi-inbox icon-title"></i>
+    {% if current_user.es_gestor %}Solicitudes de activos{% else %}Mis solicitudes{% endif %}
+  </h4>
+  <button class="btn btn-cm-red btn-sm" onclick="abrirSolicitud('stock')">
+    <i class="bi bi-plus-circle me-1"></i>Nueva solicitud
+  </button>
+</div>
+
+<!-- Pendientes -->
+<h6 class="text-muted mb-2 mt-1 fw-semibold text-uppercase" style="font-size:.7rem;letter-spacing:.08em">
+  Pendientes
+  {% if pendientes %}<span class="badge bg-cm-red ms-1">{{ pendientes|length }}</span>{% endif %}
+</h6>
+
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th class="ps-3" style="width:90px">Tipo</th>
+          <th>Detalle</th>
+          <th>Ticket</th>
+          {% if current_user.es_gestor %}<th>Solicitante</th>{% endif %}
+          <th>Fecha</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in pendientes %}
+        <tr id="sol-{{ s.id }}">
+          <td class="ps-3">
+            {% if s.tipo == 'stock' %}
+              <span class="badge" style="background:#0d6efd20;color:#0d6efd;border:1px solid #0d6efd55">
+                <i class="bi bi-cart-plus me-1"></i>Stock
+              </span>
+            {% else %}
+              <span class="badge" style="background:#6f42c120;color:#6f42c1;border:1px solid #6f42c155">
+                <i class="bi bi-lock me-1"></i>Reserva
+              </span>
+            {% endif %}
+          </td>
+          <td>
+            {% if s.tipo == 'stock' %}
+              <div class="fw-semibold">{{ s.tipo_equipo }}</div>
+              <div class="text-muted small">{{ s.descripcion }}</div>
+            {% else %}
+              <div class="fw-semibold font-monospace">{{ s.icm }}</div>
+              <div class="text-muted small">{{ s.justificacion }}</div>
+            {% endif %}
+          </td>
+          <td class="font-monospace small">{{ s.ticket or '—' }}</td>
+          {% if current_user.es_gestor %}
+          <td class="small">
+            <span class="font-monospace">{{ s.solicitante_dni }}</span><br>
+            <span class="text-muted">{{ s.solicitante_nombre }}</span>
+          </td>
+          {% endif %}
+          <td class="small text-muted">{{ s.fecha_solicitud.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td>
+            <div class="d-flex gap-1">
+              {% if current_user.es_gestor %}
+              <button class="btn btn-success btn-sm px-2" title="Aprobar"
+                      onclick="resolverSolicitud({{ s.id }}, 'aprobar')">
+                <i class="bi bi-check-lg"></i>
+              </button>
+              <button class="btn btn-outline-danger btn-sm px-2" title="Rechazar"
+                      onclick="resolverSolicitud({{ s.id }}, 'rechazar')">
+                <i class="bi bi-x-lg"></i>
+              </button>
+              {% else %}
+              <button class="btn btn-outline-secondary btn-sm px-2" title="Cancelar solicitud"
+                      onclick="cancelarSolicitud({{ s.id }})">
+                <i class="bi bi-x-circle"></i>
+              </button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="{{ 6 if current_user.es_gestor else 5 }}" class="text-center text-muted py-4">
+            <i class="bi bi-inbox me-2"></i>No hay solicitudes pendientes
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Historial -->
+{% if resueltas %}
+<h6 class="text-muted mb-2 fw-semibold text-uppercase" style="font-size:.7rem;letter-spacing:.08em">
+  Historial reciente
+</h6>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm mb-0 align-middle">
+      <thead>
+        <tr>
+          <th class="ps-3" style="width:90px">Tipo</th>
+          <th>Detalle</th>
+          <th>Ticket</th>
+          {% if current_user.es_gestor %}<th>Solicitante</th>{% endif %}
+          <th>Estado</th>
+          <th>Respuesta</th>
+          <th>Fecha</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in resueltas %}
+        <tr class="opacity-75">
+          <td class="ps-3">
+            {% if s.tipo == 'stock' %}
+              <span class="badge bg-light text-dark border"><i class="bi bi-cart-plus me-1"></i>Stock</span>
+            {% else %}
+              <span class="badge bg-light text-dark border"><i class="bi bi-lock me-1"></i>Reserva</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if s.tipo == 'stock' %}
+              <div class="fw-semibold">{{ s.tipo_equipo }}</div>
+              <div class="text-muted small">{{ s.descripcion }}</div>
+            {% else %}
+              <div class="fw-semibold font-monospace">{{ s.icm }}</div>
+              <div class="text-muted small">{{ s.justificacion }}</div>
+            {% endif %}
+          </td>
+          <td class="font-monospace small">{{ s.ticket or '—' }}</td>
+          {% if current_user.es_gestor %}
+          <td class="small text-muted">{{ s.solicitante_nombre }}</td>
+          {% endif %}
+          <td>
+            {% if s.estado == 'aprobada' %}
+              <span class="badge badge-estado-stock">Aprobada</span>
+            {% elif s.estado == 'rechazada' %}
+              <span class="badge badge-estado-retirado">Rechazada</span>
+            {% else %}
+              <span class="badge bg-light text-dark border">{{ s.estado }}</span>
+            {% endif %}
+          </td>
+          <td class="small text-muted">{{ s.respuesta or '—' }}</td>
+          <td class="small text-muted">{{ s.fecha_solicitud.strftime('%d/%m/%Y') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── MODAL: Nueva solicitud ──────────────────────────────── -->
+<div class="modal fade" id="modalSolicitud" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header border-0" style="background:var(--cm-red-light)">
+        <h5 class="modal-title fw-bold text-cm-red" id="sol-modal-title">
+          <i class="bi bi-plus-circle me-2"></i>Nueva solicitud
+        </h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Selector tipo -->
+        <div class="d-flex gap-2 mb-4" id="sol-tipo-selector">
+          <button class="btn flex-fill fw-semibold" id="btn-tipo-stock"
+                  onclick="setSolTipo('stock')"
+                  style="border:2px solid var(--cm-red);background:var(--cm-red);color:#fff">
+            <i class="bi bi-cart-plus me-2"></i>Solicitar stock
+          </button>
+          <button class="btn flex-fill fw-semibold" id="btn-tipo-reserva"
+                  onclick="setSolTipo('reserva')"
+                  style="border:2px solid var(--cm-red);color:var(--cm-red)">
+            <i class="bi bi-lock me-2"></i>Reservar activo
+          </button>
+        </div>
+        <input type="hidden" id="sol-tipo" value="stock">
+
+        <!-- Ticket (común) -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Ticket relacionado <span class="text-muted">(opcional)</span></label>
+          <div class="input-group">
+            <span class="input-group-text bg-cm-red text-white border-cm-red fw-bold"
+                  id="sol-ticket-pre" style="cursor:pointer;min-width:54px;justify-content:center"
+                  onclick="var el=this; el.textContent=el.textContent==='INC'?'REQ':'INC'">INC</span>
+            <input type="text" id="sol-ticket-num" class="form-control font-monospace"
+                   placeholder="00000000" maxlength="8"
+                   oninput="this.value=this.value.replace(/\D/g,'')">
+          </div>
+        </div>
+
+        <!-- Panel STOCK -->
+        <div id="panel-stock">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Tipo de activo necesario <span class="text-cm-red">*</span></label>
+            <select id="sol-tipo-equipo" class="form-select">
+              <option value="">— Selecciona —</option>
+              <option>Portátil</option>
+              <option>Sobremesa</option>
+              <option>Monitor</option>
+              <option>Teclado</option>
+              <option>Ratón</option>
+              <option>Impresora</option>
+              <option>Teléfono IP</option>
+              <option>Cable</option>
+              <option>Otro</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label fw-semibold">Descripción / Motivo <span class="text-cm-red">*</span></label>
+            <textarea id="sol-descripcion" class="form-control" rows="3"
+                      placeholder="Ej: El equipo del puesto 3 de Urgencias no arranca y no hay stock disponible. Se necesita portátil para INC12345678."></textarea>
+          </div>
+        </div>
+
+        <!-- Panel RESERVA -->
+        <div id="panel-reserva" class="d-none">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">ICM del equipo a reservar <span class="text-cm-red">*</span></label>
+            <input type="text" id="sol-icm" class="form-control font-monospace text-uppercase"
+                   placeholder="ICM-XXXXX"
+                   oninput="this.value=this.value.toUpperCase(); buscarEquipoSol(this.value)">
+            <div id="sol-icm-info" class="mt-1 small"></div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label fw-semibold">Justificación <span class="text-cm-red">*</span></label>
+            <textarea id="sol-justificacion" class="form-control" rows="3"
+                      placeholder="Ej: Necesito este equipo reservado para la sustitución del puesto de dirección hasta que llegue el pedido previsto en 2 semanas."></textarea>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-cm-red fw-bold" onclick="enviarSolicitud()">
+          <i class="bi bi-send me-1"></i>Enviar solicitud
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: Respuesta gestor ─────────────────────────────── -->
+{% if current_user.es_gestor %}
+<div class="modal fade" id="modalRespuesta" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold" id="resp-title">Responder solicitud</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="resp-id">
+        <input type="hidden" id="resp-accion">
+        <div class="mb-2">
+          <label class="form-label">Respuesta / Comentario <span class="text-muted">(opcional)</span></label>
+          <textarea id="resp-texto" class="form-control" rows="3"
+                    placeholder="Motivo de la decisión, instrucciones…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn fw-bold" id="resp-btn" onclick="confirmarRespuesta()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+// Pre-rellenar desde parámetros URL (vínculo desde ficha de equipo)
+document.addEventListener('DOMContentLoaded', () => {
+  const p = new URLSearchParams(location.search);
+  const tipo = p.get('prefill_tipo');
+  const icm  = p.get('prefill_icm');
+  if (tipo) {
+    abrirSolicitud(tipo);
+    if (icm && tipo === 'reserva') {
+      setTimeout(() => {
+        const el = document.getElementById('sol-icm');
+        if (el) { el.value = icm; buscarEquipoSol(icm); }
+      }, 200);
+    }
+  }
+});
+
+let _mSol = null, _mResp = null;
+
+function getMS() {
+  if (!_mSol) _mSol = new bootstrap.Modal(document.getElementById('modalSolicitud'));
+  return _mSol;
+}
+
+function abrirSolicitud(tipo = 'stock') {
+  setSolTipo(tipo);
+  document.getElementById('sol-ticket-num').value = '';
+  document.getElementById('sol-ticket-pre').textContent = 'INC';
+  document.getElementById('sol-tipo-equipo').value = '';
+  document.getElementById('sol-descripcion').value = '';
+  document.getElementById('sol-icm').value = '';
+  document.getElementById('sol-icm-info').innerHTML = '';
+  document.getElementById('sol-justificacion').value = '';
+  getMS().show();
+}
+
+function setSolTipo(tipo) {
+  document.getElementById('sol-tipo').value = tipo;
+  const isStock = tipo === 'stock';
+  document.getElementById('panel-stock').classList.toggle('d-none', !isStock);
+  document.getElementById('panel-reserva').classList.toggle('d-none', isStock);
+  const btnS = document.getElementById('btn-tipo-stock');
+  const btnR = document.getElementById('btn-tipo-reserva');
+  btnS.style.background = isStock ? 'var(--cm-red)' : '';
+  btnS.style.color      = isStock ? '#fff' : 'var(--cm-red)';
+  btnR.style.background = isStock ? '' : 'var(--cm-red)';
+  btnR.style.color      = isStock ? 'var(--cm-red)' : '#fff';
+}
+
+let _icmTimer = null;
+async function buscarEquipoSol(icm) {
+  clearTimeout(_icmTimer);
+  const info = document.getElementById('sol-icm-info');
+  if (icm.length < 3) { info.innerHTML = ''; return; }
+  _icmTimer = setTimeout(async () => {
+    const r = await _fetch(`/admin/reasignar/buscar?icm=${encodeURIComponent(icm)}`);
+    const d = await r.json();
+    if (d.ok) {
+      const e = d.equipo;
+      const estadoColor = e.estado === 'en stock' ? 'text-success' : e.estado === 'averia' ? 'text-danger' : 'text-warning';
+      info.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${e.marca || ''} ${e.modelo || ''}</span> — <span class="${estadoColor}">${e.estado}</span>`;
+    } else {
+      info.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>ICM no encontrado</span>`;
+    }
+  }, 400);
+}
+
+async function enviarSolicitud() {
+  const tipo = document.getElementById('sol-tipo').value;
+  const pre  = document.getElementById('sol-ticket-pre').textContent;
+  const num  = document.getElementById('sol-ticket-num').value.trim();
+  const body = { tipo, ticket_prefijo: pre, ticket_num: num };
+
+  if (tipo === 'stock') {
+    body.tipo_equipo  = document.getElementById('sol-tipo-equipo').value;
+    body.descripcion  = document.getElementById('sol-descripcion').value.trim();
+  } else {
+    body.icm           = document.getElementById('sol-icm').value.trim();
+    body.justificacion = document.getElementById('sol-justificacion').value.trim();
+  }
+
+  const r = await _fetch('/solicitudes/crear', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  const d = await r.json();
+  if (d.ok) {
+    getMS().hide();
+    toast('Solicitud enviada correctamente', 'success', 4000);
+    setTimeout(() => location.reload(), 1000);
+  } else {
+    toast('Error: ' + d.error, 'danger');
+  }
+}
+
+async function cancelarSolicitud(id) {
+  if (!await sisdahConfirm('¿Cancelar esta solicitud?', {title:'Cancelar solicitud', btnText:'Cancelar solicitud', danger:false, btnClass:'btn-secondary', icon:'bi-x-circle'})) return;
+  const r = await _fetch(`/solicitudes/${id}/cancelar`, {method:'POST'});
+  const d = await r.json();
+  if (d.ok) { document.getElementById(`sol-${id}`)?.remove(); toast('Solicitud cancelada', 'info'); }
+  else toast('Error: ' + d.error, 'danger');
+}
+
+{% if current_user.es_gestor %}
+function getMR() {
+  if (!_mResp) _mResp = new bootstrap.Modal(document.getElementById('modalRespuesta'));
+  return _mResp;
+}
+
+function resolverSolicitud(id, accion) {
+  document.getElementById('resp-id').value     = id;
+  document.getElementById('resp-accion').value = accion;
+  document.getElementById('resp-texto').value  = '';
+  const btn   = document.getElementById('resp-btn');
+  const title = document.getElementById('resp-title');
+  if (accion === 'aprobar') {
+    title.textContent  = 'Aprobar solicitud';
+    btn.className      = 'btn btn-success fw-bold';
+    btn.innerHTML      = '<i class="bi bi-check-circle me-1"></i>Aprobar';
+  } else {
+    title.textContent  = 'Rechazar solicitud';
+    btn.className      = 'btn btn-danger fw-bold';
+    btn.innerHTML      = '<i class="bi bi-x-circle me-1"></i>Rechazar';
+  }
+  getMR().show();
+  setTimeout(() => document.getElementById('resp-texto').focus(), 300);
+}
+
+async function confirmarRespuesta() {
+  const id      = document.getElementById('resp-id').value;
+  const accion  = document.getElementById('resp-accion').value;
+  const respuesta = document.getElementById('resp-texto').value.trim();
+  const r = await _fetch(`/solicitudes/${id}/resolver`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ accion, respuesta })
+  });
+  const d = await r.json();
+  if (d.ok) {
+    getMR().hide();
+    toast(accion === 'aprobar' ? 'Solicitud aprobada' : 'Solicitud rechazada',
+          accion === 'aprobar' ? 'success' : 'warning', 4000);
+    setTimeout(() => location.reload(), 1000);
+  } else {
+    toast('Error: ' + d.error, 'danger');
+  }
+}
+{% endif %}
+</script>
+{% endblock %}

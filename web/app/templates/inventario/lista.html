@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Inventario{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-list-ul icon-title"></i>Inventario</h4>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('exports.inventario_excel') }}{% if estado %}?estado={{ estado }}{% endif %}{% if seccion %}&seccion={{ seccion }}{% endif %}"
+       class="btn btn-outline-success btn-sm">
+      <i class="bi bi-file-earmark-excel me-1"></i>Excel
+    </a>
+    {% if current_user.es_gestor %}
+    <a href="{{ url_for('registrar.form') }}" class="btn btn-cm-red btn-sm">
+      <i class="bi bi-plus-circle me-1"></i>Registrar
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label">Buscar</label>
+        <input type="text" name="q" value="{{ q }}" class="form-control"
+               placeholder="ICM, S/N, marca, modelo…">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Estado</label>
+        <select name="estado" class="form-select">
+          <option value="">Todos</option>
+          {% for e in ['en stock','retirado','averia','reservado','papelera'] %}
+          <option value="{{ e }}" {% if estado==e %}selected{% endif %}>{{ e|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Sección</label>
+        <select name="seccion" class="form-select">
+          <option value="">Todas</option>
+          {% for s in secciones %}
+          <option value="{{ s }}" {% if seccion==s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-cm-red">
+          <i class="bi bi-search me-1"></i>Buscar
+        </button>
+        <a href="{{ url_for('inventario.lista') }}" class="btn btn-outline-secondary">Limpiar</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Tabla -->
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>ICM</th><th>Marca</th><th>Modelo</th><th>Sección</th>
+          <th>S/N</th><th>Estado</th><th>Entrada</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for eq in equipos.items %}
+        <tr class="fila-equipo" onclick="window.location='{{ url_for('inventario.detalle', icm=eq.icm) }}'"
+            style="cursor:pointer" title="Ver ficha de {{ eq.icm }}">
+          <td class="font-monospace fw-bold text-cm-red">{{ eq.icm }}</td>
+          <td>{{ eq.marca or '—' }}</td>
+          <td>{{ eq.modelo or '—' }}</td>
+          <td><span class="badge bg-light text-dark border">{{ eq.seccion or '—' }}</span></td>
+          <td class="font-monospace small text-muted">{{ eq.sn or '—' }}</td>
+          <td>
+            {% if eq.estado == 'en stock' %}<span class="badge badge-estado-stock">en stock</span>
+            {% elif eq.estado == 'retirado' %}<span class="badge badge-estado-retirado">retirado</span>
+            {% elif eq.estado == 'averia' %}<span class="badge badge-estado-averia">averia</span>
+            {% elif eq.estado == 'reservado' %}<span class="badge badge-estado-reservado">reservado</span>
+            {% elif eq.estado == 'reacondicionado' %}<span class="badge" style="background:#7B2FBE;color:white">reacondicionado</span>
+            {% else %}<span class="badge bg-secondary">{{ eq.estado }}</span>{% endif %}
+          </td>
+          <td class="small text-muted">{{ eq.fecha_entrada or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No hay equipos que coincidan</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Paginación -->
+{% if equipos.pages > 1 %}
+<nav class="mt-3">
+  <ul class="pagination pagination-sm justify-content-center">
+    {% for p in equipos.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+      <li class="page-item {% if p == equipos.page %}active{% endif %}">
+        <a class="page-link {% if p == equipos.page %}bg-cm-red border-cm-red{% endif %}"
+           href="{{ url_for('inventario.lista', page=p, q=q, estado=estado, seccion=seccion) }}">{{ p }}</a>
+      </li>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% endif %}
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}
+<small class="text-muted">{{ equipos.total }} equipos encontrados</small>
+{% endblock %}

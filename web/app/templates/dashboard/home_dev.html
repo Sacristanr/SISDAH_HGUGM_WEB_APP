@@ -1,0 +1,408 @@
+{% extends "base.html" %}
+{% block title %}Dev Center — SISDAH{% endblock %}
+
+{% block content %}
+
+{# ── Cabecera DEV ────────────────────────────────────────────────────────── #}
+<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+  <div>
+    <h4 class="fw-bold mb-0" style="font-size:1.35rem">
+      <i class="bi bi-terminal-fill me-2" style="color:var(--cm-red)"></i>
+      Dev Center
+    </h4>
+    <small class="text-muted">
+      {{ ahora.strftime('%A %d de %B · %H:%M') }} &nbsp;·&nbsp;
+      <span class="font-monospace">{{ sys_info.db_name }}@{{ sys_info.db_user }}</span>
+    </small>
+  </div>
+  <div class="d-flex gap-2 flex-wrap align-items-center">
+    <span class="badge bg-secondary font-monospace" style="font-size:.8rem">v{{ app_version }} · {{ app_release }}</span>
+    <a href="{{ url_for('admin.versiones') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-clock-history me-1"></i> Versiones
+    </a>
+    <a href="{{ url_for('admin.seguridad') }}" class="btn btn-sm btn-cm-red">
+      <i class="bi bi-shield-lock me-1"></i> Seguridad
+    </a>
+    <a href="{{ url_for('configuracion.panel') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-sliders me-1"></i> Configuración
+    </a>
+    <a href="{{ url_for('admin.panel') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-people me-1"></i> Usuarios
+    </a>
+  </div>
+</div>
+
+{# ── Alertas activas ─────────────────────────────────────────────────────── #}
+{% if sys_info.debug or not sys_info.secure or usuarios_bloqueados > 0 or logins_fail_24h >= 3 or errores_24h > 0 %}
+<div class="mb-4">
+  {% if sys_info.debug %}
+  <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-2">
+    <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+    <span><strong>DEBUG MODE ACTIVO</strong> — Nunca exponer en producción. Deshabilita en <code>.env</code> con <code>FLASK_DEBUG=0</code>.</span>
+  </div>
+  {% endif %}
+  {% if not sys_info.secure %}
+  <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-2">
+    <i class="bi bi-shield-exclamation fs-5"></i>
+    <span><strong>Cookies sin Secure</strong> — Activa <code>SESSION_SECURE=1</code> en <code>.env</code> cuando tengas HTTPS.</span>
+  </div>
+  {% endif %}
+  {% if usuarios_bloqueados > 0 %}
+  <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-2">
+    <i class="bi bi-person-lock fs-5"></i>
+    <span><strong>{{ usuarios_bloqueados }} usuario(s) bloqueado(s)</strong> por intentos fallidos de login.</span>
+    <a href="{{ url_for('admin.seguridad') }}" class="ms-auto btn btn-sm btn-outline-dark">Ver</a>
+  </div>
+  {% endif %}
+  {% if logins_fail_24h >= 3 %}
+  <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-2">
+    <i class="bi bi-key fs-5"></i>
+    <span><strong>{{ logins_fail_24h }} intentos de login fallidos</strong> en las últimas 24 h.</span>
+    <a href="{{ url_for('admin.seguridad') }}" class="ms-auto btn btn-sm btn-outline-dark">Ver log</a>
+  </div>
+  {% endif %}
+  {% if errores_24h > 0 %}
+  <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-2">
+    <i class="bi bi-bug-fill fs-5"></i>
+    <span><strong>{{ errores_24h }} error(es) 500</strong> registrado(s) en las últimas 24 h.</span>
+    <a href="{{ url_for('admin.seguridad', tipo='error') }}" class="ms-auto btn btn-sm btn-outline-danger">Ver errores</a>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div class="alert alert-success d-flex align-items-center gap-2 py-2 mb-4">
+  <i class="bi bi-shield-fill-check fs-5"></i>
+  <span><strong>Sistema estable</strong> — Sin alertas activas en las últimas 24 horas.</span>
+</div>
+{% endif %}
+
+{# ── Fila 1: Seguridad + Sistema ──────────────────────────────────────────── #}
+<div class="row g-3 mb-3">
+
+  {# Métricas de seguridad #}
+  <div class="col-12 col-xl-5">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-shield-lock me-2 text-cm-red"></i>Seguridad — últimas 24 h
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-6">
+            <div class="rounded p-3 text-center" style="background:#E8F5E9">
+              <div class="fw-bold" style="font-size:2rem;color:#1B5E20">{{ logins_ok_24h }}</div>
+              <div class="small text-muted mt-1"><i class="bi bi-check-circle me-1"></i>Logins OK</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="rounded p-3 text-center" style="background:#FFEBEE">
+              <div class="fw-bold" style="font-size:2rem;color:#B71C1C">{{ logins_fail_24h }}</div>
+              <div class="small text-muted mt-1"><i class="bi bi-x-circle me-1"></i>Fallos login</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="rounded p-3 text-center" style="background:#FFF8E1">
+              <div class="fw-bold" style="font-size:2rem;color:#795548">{{ usuarios_bloqueados }}</div>
+              <div class="small text-muted mt-1"><i class="bi bi-person-lock me-1"></i>Bloqueados</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="rounded p-3 text-center" style="background:{% if errores_24h > 0 %}#FFEBEE{% else %}#E8F5E9{% endif %}">
+              <div class="fw-bold" style="font-size:2rem;color:{% if errores_24h > 0 %}#B71C1C{% else %}#1B5E20{% endif %}">{{ errores_24h }}</div>
+              <div class="small text-muted mt-1"><i class="bi bi-bug me-1"></i>Errores 500</div>
+            </div>
+          </div>
+        </div>
+        <div class="d-grid mt-3">
+          <a href="{{ url_for('admin.seguridad') }}" class="btn btn-outline-cm-red btn-sm">
+            <i class="bi bi-journal-text me-1"></i> Ver log de auditoría completo
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Estado del sistema #}
+  <div class="col-12 col-xl-7">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-cpu me-2 text-cm-red"></i>Estado del sistema
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tr>
+            <th class="ps-3 text-muted" style="width:42%">Python</th>
+            <td class="font-monospace">{{ sys_info.python }}</td>
+            <td class="text-end pe-3"><span class="badge badge-estado-stock">OK</span></td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Sistema operativo</th>
+            <td class="small font-monospace">{{ sys_info.os }}</td>
+            <td></td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Debug mode</th>
+            <td>Flask debug</td>
+            <td class="text-end pe-3">
+              {% if sys_info.debug %}
+                <span class="badge bg-danger">ON ⚠️</span>
+              {% else %}
+                <span class="badge badge-estado-stock">OFF ✓</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Cookies HTTPS</th>
+            <td>SESSION_SECURE</td>
+            <td class="text-end pe-3">
+              {% if sys_info.secure %}
+                <span class="badge badge-estado-stock">Activo ✓</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">Inactivo</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">CSRF</th>
+            <td>Flask-WTF</td>
+            <td class="text-end pe-3"><span class="badge badge-estado-stock">Activo ✓</span></td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Cifrado contraseñas</th>
+            <td>werkzeug scrypt</td>
+            <td class="text-end pe-3"><span class="badge badge-estado-stock">OK ✓</span></td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Rate limiting</th>
+            <td>5 intentos / 5 min</td>
+            <td class="text-end pe-3"><span class="badge badge-estado-stock">Activo ✓</span></td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Base de datos</th>
+            <td class="font-monospace small">{{ sys_info.db_name }} · {{ sys_info.db_user }}</td>
+            <td class="text-end pe-3"><span class="badge badge-estado-stock">OK ✓</span></td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Solicitudes pendientes</th>
+            <td>Técnicos esperando aprobación</td>
+            <td class="text-end pe-3">
+              {% if sol_pendientes > 0 %}
+                <span class="badge badge-estado-averia">{{ sol_pendientes }}</span>
+              {% else %}
+                <span class="badge bg-light text-dark border">0</span>
+              {% endif %}
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>{# /fila 1 #}
+
+{# ── Fila 2: Inventario + Usuarios + Actividad reciente ───────────────────── #}
+<div class="row g-3 mb-3">
+
+  {# Inventario #}
+  <div class="col-12 col-md-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-box-seam me-2 text-cm-red"></i>Inventario
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tr>
+            <th class="ps-3 text-muted">Total equipos</th>
+            <td class="fw-bold text-end pe-3">{{ stats.total }}</td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">En stock</th>
+            <td class="fw-bold text-success text-end pe-3">{{ stats.en_stock }}</td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Retirados</th>
+            <td class="fw-bold text-end pe-3" style="color:#795548">{{ stats.retirados }}</td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Averías</th>
+            <td class="fw-bold text-danger text-end pe-3">{{ stats.averia }}</td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Reservados</th>
+            <td class="fw-bold text-end pe-3" style="color:var(--info)">{{ stats.reservados }}</td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Usuarios activos</th>
+            <td class="fw-bold text-end pe-3">{{ stats.usuarios }}</td>
+          </tr>
+        </table>
+      </div>
+      <div class="card-footer">
+        <a href="{{ url_for('inventario.lista') }}" class="btn btn-outline-cm-red btn-sm w-100">
+          <i class="bi bi-box-seam me-1"></i> Ver inventario
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {# Usuarios por rol #}
+  <div class="col-12 col-md-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-people me-2 text-cm-red"></i>Usuarios activos por rol
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          {% for rol, cnt in roles_dict.items() %}
+          <tr>
+            <th class="ps-3 text-muted">
+              {% if rol == 'developer' %}<i class="bi bi-code-slash me-1 text-cm-red"></i>
+              {% elif rol == 'gestor_n3' %}<i class="bi bi-star-fill me-1 text-warning"></i>
+              {% elif rol == 'gestor_n1' %}<i class="bi bi-person-badge me-1 text-info"></i>
+              {% else %}<i class="bi bi-person me-1 text-muted"></i>
+              {% endif %}
+              {{ rol }}
+            </th>
+            <td class="fw-bold text-end pe-3">{{ cnt }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+      <div class="card-footer">
+        <a href="{{ url_for('admin.usuarios') }}" class="btn btn-outline-secondary btn-sm w-100">
+          <i class="bi bi-people me-1"></i> Gestionar usuarios
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {# Últimos eventos de auditoría #}
+  <div class="col-12 col-md-4">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-journal-text me-2 text-cm-red"></i>Últimos eventos</span>
+        <a href="{{ url_for('admin.seguridad') }}" class="btn btn-sm btn-outline-secondary py-0">Ver todos</a>
+      </div>
+      <div class="card-body p-0" style="overflow:hidden">
+        <ul class="list-group list-group-flush">
+          {% for m in ultimos_logs %}
+          <li class="list-group-item px-3 py-2 {% if 'FAIL' in (m.descripcion or '') or m.icm == 'ERROR' %}list-group-item-danger{% elif m.icm == 'ADMIN' %}list-group-item-warning{% endif %}">
+            <div class="d-flex align-items-start gap-2">
+              <div class="flex-shrink-0 mt-1">
+                {% if m.icm == 'ERROR' %}
+                  <i class="bi bi-bug-fill text-danger"></i>
+                {% elif m.icm == 'ADMIN' %}
+                  <i class="bi bi-person-gear text-warning"></i>
+                {% elif 'FAIL' in (m.descripcion or '') %}
+                  <i class="bi bi-x-circle-fill text-danger"></i>
+                {% else %}
+                  <i class="bi bi-shield-check text-success"></i>
+                {% endif %}
+              </div>
+              <div class="flex-grow-1 overflow-hidden">
+                <div class="small fw-semibold text-truncate">{{ m.descripcion or m.tipo }}</div>
+                <div class="d-flex gap-2">
+                  <span class="text-muted" style="font-size:.75rem">{{ m.fecha.strftime('%d/%m %H:%M') }}</span>
+                  {% if m.usuario_dni %}<span class="font-monospace text-muted" style="font-size:.75rem">{{ m.usuario_dni }}</span>{% endif %}
+                </div>
+              </div>
+            </div>
+          </li>
+          {% else %}
+          <li class="list-group-item text-center text-muted py-4">Sin eventos recientes</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div>{# /fila 2 #}
+
+{# ── Fila 3: Accesos rápidos de gestión ───────────────────────────────────── #}
+<div class="card">
+  <div class="card-header">
+    <i class="bi bi-grid me-2 text-cm-red"></i>Accesos rápidos — Gestión y herramientas
+  </div>
+  <div class="card-body">
+    <div class="row g-2">
+
+      {% set accesos = [
+        ('admin.seguridad',      'bi-shield-lock',      'cm-red',  'Seguridad',        'Logs y auditoría'),
+        ('configuracion.panel',  'bi-sliders',          'blue',    'Configuración',     'SMTP · Departamento'),
+        ('admin.usuarios',       'bi-people-fill',      'blue',    'Usuarios',          'Gestión de cuentas'),
+        ('admin.reasignar',      'bi-arrow-left-right', 'orange',  'Reasignar',         'Cambiar sección/estado'),
+        ('historial.lista',      'bi-clock-history',    'gray',    'Historial',         'Todos los movimientos'),
+        ('estadisticas.panel',   'bi-bar-chart-fill',   'green',   'Estadísticas',      'Métricas del sistema'),
+        ('papelera.lista',       'bi-trash3',           'gray',    'Control retirada',  'Papelera y bajas'),
+        ('fichas.lista',         'bi-file-text',        'blue',    'Fichas técnicas',   'Configuraciones'),
+        ('catalogo.index',       'bi-tags',             'orange',  'Catálogo',          'Marcas y modelos'),
+        ('retiradas.admin_tipos','bi-list-check',       'gray',    'Tipos retirada',    'Configurar tipos'),
+        ('solicitudes.lista',    'bi-inbox',            'blue',    'Solicitudes',       'Aprobar / rechazar'),
+        ('revision.panel',       'bi-search',           'green',   'Revisión',          'Auditoría física'),
+      ] %}
+
+      {% for endpoint, icon, color, titulo, desc in accesos %}
+      <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+        <a href="{{ url_for(endpoint) }}" class="text-decoration-none">
+          <div class="card h-100 text-center py-3 px-2" style="border:1px solid var(--gray-200);transition:all 150ms"
+               onmouseover="this.style.borderColor='var(--cm-red)';this.style.boxShadow='var(--shadow-md)'"
+               onmouseout="this.style.borderColor='var(--gray-200)';this.style.boxShadow=''">
+            <i class="bi {{ icon }} mb-2" style="font-size:1.6rem;color:
+              {%- if color=='cm-red' %}var(--cm-red)
+              {%- elif color=='green' %}var(--success)
+              {%- elif color=='blue' %}var(--info)
+              {%- elif color=='orange' %}#E67E22
+              {%- else %}var(--gray-500)
+              {%- endif %}"></i>
+            <div class="fw-semibold small">{{ titulo }}</div>
+            <div class="text-muted" style="font-size:.75rem">{{ desc }}</div>
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+
+    </div>
+  </div>
+</div>
+
+{# ── Actividad reciente de inventario ─────────────────────────────────────── #}
+<div class="card mt-3">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span><i class="bi bi-activity me-2 text-cm-red"></i>Actividad reciente de inventario</span>
+    <a href="{{ url_for('historial.lista') }}" class="btn btn-sm btn-outline-secondary">Ver todo</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th class="ps-3">Fecha</th>
+          <th>ICM</th>
+          <th>Tipo</th>
+          <th>Técnico</th>
+          <th>Descripción</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in actividad %}
+        <tr>
+          <td class="ps-3 text-muted small text-nowrap">{{ m.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td><a href="{{ url_for('inventario.detalle', icm=m.icm) }}" class="font-monospace fw-bold text-cm-red">{{ m.icm }}</a></td>
+          <td>
+            {% if m.tipo=='entrada' %}<span class="badge badge-estado-stock">entrada</span>
+            {% elif m.tipo=='retirada' %}<span class="badge badge-estado-retirado">retirada</span>
+            {% elif m.tipo=='averia' %}<span class="badge badge-estado-averia">avería</span>
+            {% elif m.tipo=='cambio_estado' %}<span class="badge badge-estado-reservado">estado</span>
+            {% else %}<span class="badge bg-light text-dark border">{{ m.tipo }}</span>
+            {% endif %}
+          </td>
+          <td class="small font-monospace">{{ m.usuario_dni or '—' }}</td>
+          <td class="small text-muted text-truncate" style="max-width:280px">{{ m.descripcion or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-3">Sin actividad reciente</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

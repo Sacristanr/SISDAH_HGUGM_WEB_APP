@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Historial ICM{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-clock-history icon-title"></i>Historial de movimientos</h4>
+</div>
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-md-5">
+        <label class="form-label">Buscar ICM, usuario o descripción</label>
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="ICM, DNI técnico…">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Tipo</label>
+        <select name="tipo" class="form-select">
+          <option value="">Todos</option>
+          {% for t in ['entrada','retirada','modificacion','restauracion'] %}
+          <option value="{{ t }}" {% if tipo==t %}selected{% endif %}>{{ t|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-cm-red"><i class="bi bi-search me-1"></i>Buscar</button>
+        <a href="{{ url_for('historial.lista') }}" class="btn btn-outline-secondary">Limpiar</a>
+      </div>
+    </form>
+  </div>
+</div>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0">
+      <thead>
+        <tr><th class="ps-3">Fecha</th><th>ICM</th><th>Tipo</th><th>Usuario</th><th>PC</th><th>Descripción</th></tr>
+      </thead>
+      <tbody>
+        {% for m in movimientos.items %}
+        <tr>
+          <td class="ps-3 small text-muted">{{ m.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td>
+            {% if m.icm in ('AUTH', 'ADMIN') %}
+              <span class="font-monospace fw-bold text-muted">{{ m.icm }}</span>
+            {% else %}
+              <a href="{{ url_for('inventario.detalle', icm=m.icm) }}" class="text-cm-red font-monospace fw-bold">{{ m.icm }}</a>
+            {% endif %}
+          </td>
+          <td>
+            {% if m.tipo=='entrada' %}<span class="badge badge-estado-stock">entrada</span>
+            {% elif m.tipo=='retirada' %}<span class="badge badge-estado-retirado">retirada</span>
+            {% elif m.tipo=='restauracion' %}<span class="badge badge-estado-reservado">restauración</span>
+            {% else %}<span class="badge bg-light text-dark border">{{ m.tipo }}</span>{% endif %}
+          </td>
+          <td class="font-monospace small">{{ m.usuario_dni or '—' }}</td>
+          <td class="small text-muted">{{ m.pc or '—' }}</td>
+          <td class="small text-muted">{{ m.descripcion or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">Sin movimientos</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% if movimientos.pages > 1 %}
+<nav class="mt-3"><ul class="pagination pagination-sm justify-content-center">
+  {% for p in movimientos.iter_pages(left_edge=1,right_edge=1,left_current=2,right_current=2) %}
+    {% if p %}<li class="page-item {% if p==movimientos.page %}active{% endif %}">
+      <a class="page-link {% if p==movimientos.page %}bg-cm-red border-cm-red{% endif %}"
+         href="{{ url_for('historial.lista',page=p,q=q,tipo=tipo) }}">{{ p }}</a></li>
+    {% else %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+  {% endfor %}
+</ul></nav>
+{% endif %}
+<small class="text-muted">{{ movimientos.total }} movimientos</small>
+{% endblock %}

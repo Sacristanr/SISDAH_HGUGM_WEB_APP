@@ -1,0 +1,126 @@
+<script>
+// ═══════════════════════════════════════════════════════════════
+// SCRIPTS COMUNES — modo global, lista de pendientes, finalizar
+// ═══════════════════════════════════════════════════════════════
+
+const pendientes = [];
+
+// ── Cambiar entre modo Lote e Individual ─────────────────────
+function setModoGlobal(modo) {
+  const panelInd  = document.getElementById('panel-individual');
+  const panelLote = document.getElementById('panel-lote');
+  const btnLote   = document.getElementById('btn-modo-lote');
+  const btnInd    = document.getElementById('btn-modo-individual');
+
+  if (modo === 'individual') {
+    panelInd.classList.remove('d-none');
+    panelLote.classList.add('d-none');
+    btnInd.classList.add('active', 'btn-cm-red');
+    btnInd.classList.remove('btn-outline-secondary');
+    btnLote.classList.remove('active', 'btn-cm-red');
+    btnLote.classList.add('btn-outline-secondary');
+    setTimeout(() => document.getElementById('ind-icm').focus(), 50);
+  } else {
+    panelInd.classList.add('d-none');
+    panelLote.classList.remove('d-none');
+    btnLote.classList.add('active', 'btn-cm-red');
+    btnLote.classList.remove('btn-outline-secondary');
+    btnInd.classList.remove('active', 'btn-cm-red');
+    btnInd.classList.add('btn-outline-secondary');
+  }
+}
+
+// ── Lista de pendientes ───────────────────────────────────────
+function actualizarLista() {
+  const ul = document.getElementById('lista-pendientes');
+  document.getElementById('badge-count').textContent    = pendientes.length;
+  document.getElementById('btn-finalizar').disabled     = pendientes.length === 0;
+
+  if (pendientes.length === 0) {
+    ul.innerHTML = '<li class="list-group-item text-center text-muted small py-4">Sin equipos aún</li>';
+    return;
+  }
+  ul.innerHTML = pendientes.map((p, i) => {
+    const esTel = p._tipo === 'telefono';
+    const linea1 = esTel
+      ? `<span class="fw-bold small text-cm-red">${p.modelo}</span>`
+      : `<span class="font-monospace fw-bold small text-cm-red">${p.icm}</span>`;
+    const linea2 = esTel
+      ? `<span class="text-muted font-monospace" style="font-size:.72rem">${p.ns || p.mac || ''}</span>`
+      : (p.sn ? `<span class="text-muted" style="font-size:.72rem">S/N: ${p.sn}</span>` : '');
+    return `
+    <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+      <div>${linea1}${linea2 ? '<br>' + linea2 : ''}</div>
+      <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="quitarPendiente(${i})">
+        <i class="bi bi-x"></i>
+      </button>
+    </li>`;
+  }).join('');
+}
+
+function quitarPendiente(i) {
+  pendientes.splice(i, 1);
+  actualizarLista();
+}
+
+// ── Finalizar y guardar lote ──────────────────────────────────
+async function finalizar() {
+  if (pendientes.length === 0) return;
+
+  const seccion = document.getElementById('sel-seccion').value;
+  const btn = document.getElementById('btn-finalizar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando…';
+
+  try {
+    // ── Modo TELÉFONOS: guardar uno a uno ──────────────────────
+    if (seccion === 'TELÉFONOS') {
+      let ok = 0, errores = 0;
+      for (const p of pendientes) {
+        const r = await _fetch('/registrar/guardar_telefono', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(p)
+        });
+        const d = await r.json();
+        d.ok ? ok++ : errores++;
+      }
+      toast(`${ok} teléfono${ok !== 1 ? 's' : ''} registrado${ok !== 1 ? 's' : ''}.`
+            + (errores ? ` ⚠ ${errores} error${errores !== 1 ? 'es' : ''}.` : ''),
+            errores ? 'warning' : 'success', 4000);
+      pendientes.length = 0;
+      actualizarLista();
+      return;
+    }
+
+    // ── Modo equipos normal ────────────────────────────────────
+    const marca  = document.getElementById('sel-marca').value;
+    const modelo = getModeloSeleccionado();
+    const pedido = document.getElementById('inp-pedido').value.trim();
+
+    if (!seccion || !marca || !modelo) {
+      toast('Completa sección, marca y modelo', 'warning');
+      return;
+    }
+
+    const res  = await _fetch('/registrar/guardar', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ items: pendientes, numero_pedido: pedido, marca, modelo, seccion })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      let msg = data.guardados.length + ' equipo' + (data.guardados.length !== 1 ? 's' : '') + ' guardado' + (data.guardados.length !== 1 ? 's' : '') + '.';
+      if (data.duplicados.length) msg += ' ' + data.duplicados.length + ' duplicados omitidos.';
+      toast(msg, 'success', 4000);
+      pendientes.length = 0;
+      actualizarLista();
+    } else {
+      toast('Error: ' + (data.error || 'desconocido'), 'danger');
+    }
+  } catch (e) {
+    toast('Error de conexión: ' + e.message, 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Finalizar y guardar';
+  }
+}
+</script>

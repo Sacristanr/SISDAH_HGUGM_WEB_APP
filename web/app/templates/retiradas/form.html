@@ -1,0 +1,731 @@
+{% extends "base.html" %}
+{% block title %}Retirada{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-box-arrow-right icon-title"></i>Registrar retirada</h4>
+  {% if current_user.es_admin %}
+  <a href="{{ url_for('retiradas.admin_tipos') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-gear me-1"></i>Gestionar tipos
+  </a>
+  {% endif %}
+</div>
+
+<!-- ══ SELECTOR DE TIPO ══════════════════════════════════════════════ -->
+<div class="row g-3 mb-4" id="selector-tipos">
+  {% set total_tiles = tipos|length + 1 %}
+  {% set col_size = (12 // total_tiles) if total_tiles <= 4 else 3 %}
+  {% for tipo in tipos %}
+  <div class="col-md-{{ col_size }}">
+    <div class="card tile-tipo h-100 text-center"
+         id="tile-{{ tipo.panel_clave }}"
+         onclick="seleccionarTipo('{{ tipo.panel_clave }}')"
+         style="cursor:pointer;border:2px solid transparent;transition:all 180ms">
+      <div class="card-body py-4">
+        <i class="bi {{ tipo.icono }}" style="font-size:2.2rem;color:var(--cm-red)"></i>
+        <div class="fw-bold mt-2">{{ tipo.nombre }}</div>
+        {% if tipo.descripcion %}
+        <div class="text-muted small mt-1">{{ tipo.descripcion }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  <!-- Tile especial: Piezas y complementos -->
+  <div class="col-md-{{ col_size }}">
+    <a href="{{ url_for('piezas.lista') }}" class="text-decoration-none">
+      <div class="card tile-tipo h-100 text-center"
+           style="cursor:pointer;border:2px solid transparent;transition:all 180ms">
+        <div class="card-body py-4">
+          <i class="bi bi-tools" style="font-size:2.2rem;color:var(--cm-red)"></i>
+          <div class="fw-bold mt-2">Piezas y complementos</div>
+          <div class="text-muted small mt-1">Retirar stock del almacén</div>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+<!-- ══ PANEL HARDWARE (ICM) ══════════════════════════════════════════ -->
+<div id="panel-hardware" class="d-none">
+<div class="row justify-content-center g-4">
+  <div class="col-md-6 col-lg-5">
+
+    <div class="card mb-3">
+      <div class="card-header red-header"><span class="badge bg-cm-red me-2">1</span>Datos de la retirada</div>
+      <div class="card-body">
+        <!-- DNI auto-identificado: técnico ya autenticado, no requiere introducirlo -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Técnico</label>
+          <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-3"
+               style="background:var(--success-light);border:1.5px solid rgba(18,183,106,.25)">
+            <i class="bi bi-person-check-fill" style="color:var(--success);font-size:1.1rem" aria-hidden="true"></i>
+            <span class="font-monospace fw-bold" style="letter-spacing:3px;color:var(--gray-900)">{{ current_user.dni }}</span>
+            <span class="text-muted small ms-1">{{ current_user.nombre }}</span>
+            <i class="bi bi-check-circle-fill ms-auto" style="color:var(--success)" aria-hidden="true"></i>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Tipo de ticket</label>
+          <div class="d-flex gap-2 mb-2">
+            <button type="button" id="hw-btn-inc" class="btn btn-cm-red flex-grow-1"
+                    onclick="hwSelTipo('INC')">
+              <i class="bi bi-exclamation-circle me-1"></i>INC — Incidencia
+            </button>
+            <button type="button" id="hw-btn-req" class="btn btn-outline-secondary flex-grow-1"
+                    onclick="hwSelTipo('REQ')">
+              <i class="bi bi-clipboard-check me-1"></i>REQ — Petición
+            </button>
+          </div>
+          <div class="input-group">
+            <span class="input-group-text bg-cm-red text-white fw-bold border-cm-red"
+                  id="hw-ticket-prefijo" style="min-width:52px;justify-content:center">INC</span>
+            <input type="text" id="hw-ticket-num" class="form-control font-monospace text-center"
+                   placeholder="00000000" maxlength="8" autocomplete="off"
+                   oninput="hwValidarTicket()" style="letter-spacing:3px;font-size:1.1rem">
+            <span class="input-group-text" id="hw-ticket-icon">
+              <i class="bi bi-dash text-muted"></i>
+            </span>
+          </div>
+          <div id="hw-ticket-feedback" class="form-text">&nbsp;</div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">ICM del equipo</label>
+          <div class="input-group">
+            <input type="text" id="hw-icm" class="form-control form-control-lg font-monospace text-center"
+                   placeholder="Escanea o escribe el ICM" autocomplete="off">
+            <button class="btn btn-cm-red" onclick="hwBuscarICM()">
+              <i class="bi bi-search"></i>
+            </button>
+          </div>
+          <div id="hw-icm-feedback" class="mt-2"></div>
+        </div>
+      </div>
+    </div>
+
+    {% if not current_user.es_admin %}
+    <div class="card mb-3 d-none" id="hw-card-verificacion" style="border-color:#FFE082">
+      <div class="card-header" style="background:#FFF8E1;border-color:#FFE082;color:#795548">
+        <span class="badge bg-warning text-dark me-2">2</span>Verificación física obligatoria
+      </div>
+      <div class="card-body">
+        <div id="hw-equipo-info" class="alert alert-light border mb-3 py-2 small"></div>
+        <label class="form-label">Escanea el ICM físico del equipo</label>
+        <input type="text" id="hw-verificacion"
+               class="form-control form-control-lg font-monospace text-center"
+               placeholder="Escanea el ICM físico" autocomplete="off">
+        <div id="hw-ver-feedback" class="mt-2"></div>
+      </div>
+    </div>
+    {% else %}
+    <div class="card mb-3 d-none" id="hw-card-verificacion">
+      <div class="card-header" style="background:#E8F5E9;color:#1B5E20">
+        <i class="bi bi-shield-check me-2"></i>Administrador — sin verificación
+      </div>
+      <div class="card-body py-2">
+        <div id="hw-equipo-info" class="small"></div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div id="hw-card-confirmar" class="d-none">
+      <div class="alert border-0 mb-3" style="background:#E8F5E9;color:#1B5E20">
+        <i class="bi bi-check-circle-fill me-2"></i>
+        <strong>Listo para retirar.</strong>
+        <div class="small mt-1" id="hw-confirmar-resumen"></div>
+      </div>
+      <button class="btn btn-cm-red w-100 btn-lg fw-bold" onclick="hwAbrirModal()">
+        <i class="bi bi-check2-circle me-2"></i>Confirmar retirada
+      </button>
+    </div>
+  </div>
+
+  <div class="col-md-4 col-lg-3">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-info-circle me-2 text-cm-red"></i>Cambiar estado / Averías</div>
+      <div class="card-body text-center py-4">
+        <i class="bi bi-search text-muted" style="font-size:2.5rem"></i>
+        <p class="text-muted small mt-3 mb-3">
+          Para registrar una avería o cambiar el estado, busca el ICM en el inventario.
+        </p>
+        <a href="{{ url_for('inventario.lista') }}" class="btn btn-outline-cm-red w-100">
+          <i class="bi bi-list-ul me-2"></i>Ir al inventario
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+</div>{# /panel-hardware #}
+
+<!-- ══ PANEL RED (Teléfonos / AP WiFi) ═════════════════════════════ -->
+<div id="panel-red" class="d-none">
+<div class="row justify-content-center g-4">
+  <div class="col-md-7 col-lg-6">
+
+    <!-- Paso 1: Buscar dispositivo -->
+    <div class="card mb-3">
+      <div class="card-header red-header">
+        <span class="badge bg-cm-red me-2">1</span>
+        <span id="red-titulo-paso1">Buscar dispositivo por SN o MAC</span>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Número de serie (SN)</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="bi bi-upc-scan"></i></span>
+              <input type="text" id="red-ns" class="form-control font-monospace"
+                     placeholder="Escanea o escribe el SN" autocomplete="off">
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">MAC address</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="bi bi-hdd-network"></i></span>
+              <input type="text" id="red-mac" class="form-control font-monospace"
+                     placeholder="XX:XX:XX:XX:XX:XX" autocomplete="off">
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-cm-red mt-3 w-100" onclick="redBuscar()">
+          <i class="bi bi-search me-1"></i>Buscar dispositivo
+        </button>
+        <div id="red-busqueda-feedback" class="mt-2"></div>
+      </div>
+    </div>
+
+    <!-- Resultado de búsqueda -->
+    <div id="red-card-resultado" class="d-none">
+      <div class="card border-0 mb-3" style="background:var(--cm-red-light);border-left:4px solid var(--cm-red) !important;border:1px solid rgba(200,16,46,.2)">
+        <div class="card-body py-3">
+          <div class="d-flex align-items-start gap-3">
+            <i class="bi bi-check-circle-fill text-cm-red mt-1" style="font-size:1.3rem"></i>
+            <div class="flex-grow-1">
+              <div class="fw-bold" id="red-res-nombre"></div>
+              <div class="small text-muted mt-1">
+                <span id="red-res-detalle"></span>
+              </div>
+              <div class="small mt-1">
+                Estado actual: <span class="badge" id="red-res-estado"></span>
+              </div>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" onclick="redLimpiarBusqueda()">
+              <i class="bi bi-arrow-counterclockwise"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Paso 2: Datos de salida -->
+      <div class="card mb-3">
+        <div class="card-header red-header">
+          <span class="badge bg-cm-red me-2">2</span>Datos de la retirada
+        </div>
+        <div class="card-body">
+          <!-- DNI auto-identificado: técnico ya autenticado -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Técnico</label>
+            <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-3"
+                 style="background:var(--success-light);border:1.5px solid rgba(18,183,106,.25)">
+              <i class="bi bi-person-check-fill" style="color:var(--success);font-size:1.1rem" aria-hidden="true"></i>
+              <span class="font-monospace fw-bold" style="letter-spacing:3px;color:var(--gray-900)">{{ current_user.dni }}</span>
+              <span class="text-muted small ms-1">{{ current_user.nombre }}</span>
+              <i class="bi bi-check-circle-fill ms-auto" style="color:var(--success)" aria-hidden="true"></i>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Tipo de ticket</label>
+            <div class="d-flex gap-2 mb-2">
+              <button type="button" id="red-btn-inc" class="btn btn-cm-red flex-grow-1"
+                      onclick="redSelTipo('INC')">
+                <i class="bi bi-exclamation-circle me-1"></i>INC — Incidencia
+              </button>
+              <button type="button" id="red-btn-req" class="btn btn-outline-secondary flex-grow-1"
+                      onclick="redSelTipo('REQ')">
+                <i class="bi bi-clipboard-check me-1"></i>REQ — Petición
+              </button>
+            </div>
+            <div class="input-group">
+              <span class="input-group-text bg-cm-red text-white fw-bold border-cm-red"
+                    id="red-ticket-prefijo" style="min-width:52px;justify-content:center">INC</span>
+              <input type="text" id="red-ticket-num" class="form-control font-monospace text-center"
+                     placeholder="00000000" maxlength="8" autocomplete="off"
+                     oninput="redValidarTicket()" style="letter-spacing:3px;font-size:1.1rem">
+              <span class="input-group-text" id="red-ticket-icon">
+                <i class="bi bi-dash text-muted"></i>
+              </span>
+            </div>
+            <div id="red-ticket-feedback" class="form-text">&nbsp;</div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Ubicación física de salida</label>
+            <input type="text" id="red-ubicacion" class="form-control"
+                   placeholder="Ej: Planta 3, Consulta 12 — Despacho del Dr. García">
+            <div class="form-text">¿Dónde estaba físicamente el dispositivo al retirarlo?</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Confirmar -->
+      <button class="btn btn-cm-red w-100 btn-lg fw-bold" onclick="redConfirmar()">
+        <i class="bi bi-check2-circle me-2"></i>Confirmar retirada
+      </button>
+    </div>
+
+  </div>
+</div>
+</div>{# /panel-red #}
+
+
+<!-- ══ MODAL CONFIRMACIÓN HARDWARE ══════════════════════════════════ -->
+<div id="modal-retirada" role="dialog" aria-modal="true" aria-labelledby="modal-titulo"
+     style="display:none;position:fixed;inset:0;z-index:1060;">
+  <div id="modal-backdrop"
+       style="position:absolute;inset:0;background:rgba(0,0,0,.45);
+              opacity:0;transition:opacity 120ms ease-out;"
+       onclick="hwCerrarModal()"></div>
+  <div id="modal-panel"
+       style="position:absolute;top:50%;left:50%;width:min(480px,calc(100vw - 2rem));
+              transform:translate(-50%,-50%) scale(.93);opacity:0;
+              background:#fff;border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.22);
+              overflow:hidden;
+              transition:transform 220ms cubic-bezier(.34,1.56,.64,1),opacity 180ms ease-out;">
+    <div style="height:5px;background:var(--cm-red)"></div>
+    <div style="padding:1.75rem 1.75rem 1.5rem">
+      <div class="d-flex align-items-start gap-3 mb-4">
+        <div style="width:44px;height:44px;border-radius:50%;background:var(--cm-red-light);
+                    display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="bi bi-box-arrow-right" style="font-size:1.35rem;color:var(--cm-red)"></i>
+        </div>
+        <div>
+          <h5 id="modal-titulo" class="mb-0 fw-bold">Confirmar salida de equipo</h5>
+          <p class="mb-0 small text-muted">Revisa los datos antes de registrar la retirada</p>
+        </div>
+        <button onclick="hwCerrarModal()" style="margin-left:auto;background:none;border:none;
+                padding:.25rem;border-radius:6px;cursor:pointer;color:var(--gray-600)">
+          <i class="bi bi-x-lg" style="font-size:1.1rem"></i>
+        </button>
+      </div>
+      <div id="modal-equipo-card"
+           style="background:var(--gray-50);border:1px solid var(--gray-200);
+                  border-left:4px solid var(--cm-red);border-radius:8px;
+                  padding:.875rem 1rem;margin-bottom:1rem">
+        <div class="small fw-semibold mb-1 text-muted" style="text-transform:uppercase;letter-spacing:.04em">Equipo</div>
+        <div id="modal-equipo-nombre" class="fw-bold"></div>
+        <div id="modal-equipo-icm" class="font-monospace small mt-1 text-cm-red"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem .75rem;margin-bottom:1.5rem">
+        <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:6px;padding:.625rem .875rem">
+          <div class="small text-muted mb-1">Técnico (DNI)</div>
+          <div id="modal-dni" class="font-monospace fw-semibold"></div>
+        </div>
+        <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:6px;padding:.625rem .875rem">
+          <div class="small text-muted mb-1">Ticket</div>
+          <div id="modal-ticket" class="font-monospace fw-semibold"></div>
+        </div>
+        <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:6px;padding:.625rem .875rem;grid-column:1/-1">
+          <div class="small text-muted mb-1">Sección / Modelo</div>
+          <div id="modal-seccion"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:.5rem;align-items:flex-start;background:#FFF8E1;
+                  border:1px solid #FFE082;border-radius:6px;padding:.625rem .875rem;margin-bottom:1.5rem">
+        <i class="bi bi-exclamation-triangle-fill" style="color:#D4A000;margin-top:.1rem;flex-shrink:0"></i>
+        <span class="small" style="color:#5D4037">Esta acción registrará la salida del equipo. No se puede deshacer desde la interfaz.</span>
+      </div>
+      <div class="d-flex gap-2">
+        <button onclick="hwCerrarModal()"
+                style="flex:1;padding:.7rem 1rem;border:1px solid var(--gray-300);
+                       border-radius:8px;background:#fff;color:var(--gray-700);font-weight:500;cursor:pointer">
+          Cancelar
+        </button>
+        <button id="modal-btn-confirmar" onclick="hwEjecutar()"
+                style="flex:1.4;padding:.7rem 1rem;border:none;border-radius:8px;
+                       background:var(--cm-red);color:#fff;font-weight:600;cursor:pointer">
+          <i class="bi bi-check2-circle me-1"></i>Registrar retirada
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const esAdmin      = {{ 'true' if current_user.es_admin else 'false' }};
+const CURRENT_DNI  = {{ current_user.dni | tojson }};  // DNI del técnico autenticado
+
+// ══ SELECTOR DE TIPO ══════════════════════════════════════════════════
+let tipoActual = null;
+
+function seleccionarTipo(clave) {
+  tipoActual = clave;
+  // Resaltar tile activo
+  document.querySelectorAll('.tile-tipo').forEach(t => {
+    t.style.borderColor = 'transparent';
+    t.style.background  = '';
+    t.querySelector('i').style.color = 'var(--cm-red)';
+  });
+  const tileActivo = document.getElementById('tile-' + clave);
+  if (tileActivo) {
+    tileActivo.style.borderColor = 'var(--cm-red)';
+    tileActivo.style.background  = 'var(--cm-red-light)';
+  }
+
+  // Mostrar panel correcto
+  document.getElementById('panel-hardware').classList.add('d-none');
+  document.getElementById('panel-red').classList.add('d-none');
+
+  if (clave === 'hardware') {
+    document.getElementById('panel-hardware').classList.remove('d-none');
+    setTimeout(() => document.getElementById('hw-icm').focus(), 80);
+  } else if (clave === 'telefono' || clave === 'ap_wifi') {
+    document.getElementById('red-titulo-paso1').textContent =
+      clave === 'telefono' ? 'Buscar teléfono por SN o MAC' : 'Buscar AP WiFi por SN o MAC';
+    document.getElementById('panel-red').classList.remove('d-none');
+    setTimeout(() => document.getElementById('red-ns').focus(), 80);
+  }
+  // Scroll suave al panel
+  document.getElementById('panel-' + (clave === 'hardware' ? 'hardware' : 'red'))
+    .scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ══ HARDWARE — lógica ICM ═════════════════════════════════════════════
+let hwTipoTicket = 'INC';
+let hwEquipoActual = null;
+
+function hwSelTipo(tipo) {
+  hwTipoTicket = tipo;
+  document.getElementById('hw-ticket-prefijo').textContent = tipo;
+  document.getElementById('hw-btn-inc').className = tipo === 'INC'
+    ? 'btn btn-cm-red flex-grow-1' : 'btn btn-outline-secondary flex-grow-1';
+  document.getElementById('hw-btn-req').className = tipo === 'REQ'
+    ? 'btn btn-cm-red flex-grow-1' : 'btn btn-outline-secondary flex-grow-1';
+  hwValidarTicket();
+}
+
+function hwValidarTicket() {
+  const num = document.getElementById('hw-ticket-num').value.replace(/\D/g,'');
+  document.getElementById('hw-ticket-num').value = num;
+  const ico = document.getElementById('hw-ticket-icon').querySelector('i');
+  const fb  = document.getElementById('hw-ticket-feedback');
+  if (!num) { ico.className = 'bi bi-dash text-muted'; fb.textContent = ''; return; }
+  if (num.length < 8) {
+    ico.className = 'bi bi-x-circle text-danger';
+    fb.className = 'form-text text-danger';
+    fb.textContent = num.length + '/8 dígitos';
+  } else {
+    ico.className = 'bi bi-check-circle-fill text-success';
+    fb.className = 'form-text text-success';
+    fb.textContent = 'Ticket: ' + hwTipoTicket + num;
+  }
+}
+
+function hwGetTicket() {
+  const num = document.getElementById('hw-ticket-num').value;
+  return num.length === 8 ? hwTipoTicket + num : null;
+}
+
+let hwTimerICM = null;
+document.getElementById('hw-icm').addEventListener('input', () => {
+  clearTimeout(hwTimerICM);
+  if (!document.getElementById('hw-icm').value.trim()) return;
+  hwTimerICM = setTimeout(hwBuscarICM, 80);
+});
+document.getElementById('hw-icm').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); clearTimeout(hwTimerICM); hwBuscarICM(); }
+});
+
+async function hwBuscarICM() {
+  const icm = document.getElementById('hw-icm').value.trim().toUpperCase();
+  if (!icm) return;
+  const fb = document.getElementById('hw-icm-feedback');
+  const r  = await _fetch('/retiradas/buscar_icm?icm=' + encodeURIComponent(icm));
+  const d  = await r.json();
+  if (!d.ok) {
+    fb.innerHTML = '<div class="alert alert-danger py-2 mb-0"><i class="bi bi-x-circle me-1"></i>' + d.error + '</div>';
+    hwEquipoActual = null;
+    document.getElementById('hw-card-verificacion').classList.add('d-none');
+    document.getElementById('hw-card-confirmar').classList.add('d-none');
+    return;
+  }
+  hwEquipoActual = d.equipo;
+  fb.innerHTML = '';
+  const infoHtml = '<strong class="text-cm-red">' + hwEquipoActual.icm + '</strong> &mdash; ' +
+    (hwEquipoActual.marca||'') + ' ' + (hwEquipoActual.modelo||'') +
+    '<br><small class="text-muted">Sección: ' + (hwEquipoActual.seccion||'&mdash;') +
+    ' · S/N: ' + (hwEquipoActual.sn||'&mdash;') + '</small>';
+  document.getElementById('hw-equipo-info').innerHTML = infoHtml;
+  document.getElementById('hw-card-verificacion').classList.remove('d-none');
+  if (esAdmin) {
+    document.getElementById('hw-confirmar-resumen').textContent =
+      hwEquipoActual.icm + ' - ' + (hwEquipoActual.marca||'') + ' ' + (hwEquipoActual.modelo||'');
+    document.getElementById('hw-card-confirmar').classList.remove('d-none');
+  } else {
+    document.getElementById('hw-verificacion').value = '';
+    document.getElementById('hw-ver-feedback').innerHTML = '';
+    document.getElementById('hw-card-confirmar').classList.add('d-none');
+    document.getElementById('hw-verificacion').focus();
+  }
+}
+
+{% if not current_user.es_admin %}
+let hwTimerVer = null;
+document.getElementById('hw-verificacion').addEventListener('input', () => {
+  clearTimeout(hwTimerVer);
+  hwTimerVer = setTimeout(() => {
+    if (!hwEquipoActual) return;
+    const v  = document.getElementById('hw-verificacion').value.trim().toUpperCase();
+    const fb = document.getElementById('hw-ver-feedback');
+    if (v === hwEquipoActual.icm) {
+      fb.innerHTML = '<div class="alert py-2 mb-0 border-0" style="background:#E8F5E9;color:#1B5E20"><i class="bi bi-check-circle me-1"></i>ICM verificado</div>';
+      document.getElementById('hw-confirmar-resumen').textContent =
+        hwEquipoActual.icm + ' - ' + (hwEquipoActual.marca||'') + ' ' + (hwEquipoActual.modelo||'');
+      document.getElementById('hw-card-confirmar').classList.remove('d-none');
+    } else if (v.length >= hwEquipoActual.icm.length) {
+      fb.innerHTML = '<div class="alert alert-danger py-2 mb-0"><i class="bi bi-x-circle me-1"></i>ICM no coincide</div>';
+      document.getElementById('hw-verificacion').value = '';
+      document.getElementById('hw-card-confirmar').classList.add('d-none');
+    }
+  }, 80);
+});
+{% endif %}
+
+// Modal Hardware
+let _hwRaf = null;
+function hwAbrirModal() {
+  const dni    = CURRENT_DNI;
+  const ticket = hwGetTicket();
+  if (!ticket) { toast('El ticket debe tener 8 dígitos', 'warning'); document.getElementById('hw-ticket-num').focus(); return; }
+  if (!hwEquipoActual) { toast('Busca un equipo primero', 'warning'); return; }
+
+  document.getElementById('modal-dni').textContent    = dni;
+  document.getElementById('modal-ticket').textContent = ticket;
+  document.getElementById('modal-equipo-icm').textContent =
+    'ICM: ' + hwEquipoActual.icm + (hwEquipoActual.sn ? '  ·  S/N: ' + hwEquipoActual.sn : '');
+  document.getElementById('modal-equipo-nombre').textContent =
+    [hwEquipoActual.marca, hwEquipoActual.modelo].filter(Boolean).join(' ') || hwEquipoActual.icm;
+  document.getElementById('modal-seccion').textContent = hwEquipoActual.seccion || '—';
+
+  const modal   = document.getElementById('modal-retirada');
+  const panel   = document.getElementById('modal-panel');
+  const backdrop = document.getElementById('modal-backdrop');
+  modal.style.display = 'block';
+  cancelAnimationFrame(_hwRaf);
+  _hwRaf = requestAnimationFrame(() => requestAnimationFrame(() => {
+    backdrop.style.opacity = '1';
+    panel.style.transform  = 'translate(-50%,-50%) scale(1)';
+    panel.style.opacity    = '1';
+  }));
+  document.addEventListener('keydown', _hwKeydown);
+  document.getElementById('modal-btn-confirmar').focus();
+}
+
+function hwCerrarModal() {
+  const panel   = document.getElementById('modal-panel');
+  const backdrop = document.getElementById('modal-backdrop');
+  panel.style.transition    = 'transform 100ms ease-in, opacity 100ms ease-in';
+  backdrop.style.transition = 'opacity 100ms ease-in';
+  panel.style.transform     = 'translate(-50%,-50%) scale(.96)';
+  panel.style.opacity       = '0';
+  backdrop.style.opacity    = '0';
+  setTimeout(() => {
+    document.getElementById('modal-retirada').style.display = 'none';
+    panel.style.transition    = 'transform 220ms cubic-bezier(.34,1.56,.64,1), opacity 180ms ease-out';
+    backdrop.style.transition = 'opacity 120ms ease-out';
+    panel.style.transform     = 'translate(-50%,-50%) scale(.93)';
+  }, 110);
+  document.removeEventListener('keydown', _hwKeydown);
+}
+
+function _hwKeydown(e) {
+  if (e.key === 'Escape') { hwCerrarModal(); return; }
+  if (e.key === 'Tab') {
+    const foc = document.getElementById('modal-panel').querySelectorAll('button:not([disabled])');
+    const first = foc[0], last = foc[foc.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+}
+
+async function hwEjecutar() {
+  const btn = document.getElementById('modal-btn-confirmar');
+  btn.disabled = true; btn.style.opacity = '.7';
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Registrando…';
+
+  const dni    = CURRENT_DNI;
+  const ticket = hwGetTicket();
+  const icmVer = esAdmin ? hwEquipoActual.icm :
+    (document.getElementById('hw-verificacion')?.value.trim().toUpperCase() || hwEquipoActual.icm);
+
+  try {
+    const r = await _fetch('/retiradas/confirmar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({icm:hwEquipoActual.icm, dni, ticket, icm_verificacion:icmVer})
+    });
+    const d = await r.json();
+    if (d.ok) {
+      hwCerrarModal();
+      toast('Retirada registrada: ' + d.icm, 'success', 4000);
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      toast('Error: ' + d.error, 'danger');
+      btn.disabled = false; btn.style.opacity = '1';
+      btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Registrar retirada';
+    }
+  } catch(err) {
+    toast('Error de red.', 'danger');
+    btn.disabled = false; btn.style.opacity = '1';
+    btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Registrar retirada';
+  }
+}
+
+// ══ RED (Teléfonos / AP WiFi) ══════════════════════════════════════
+let redEquipoActual = null;
+let redTipoTicket   = 'INC';
+
+function redSelTipo(tipo) {
+  redTipoTicket = tipo;
+  document.getElementById('red-ticket-prefijo').textContent = tipo;
+  document.getElementById('red-btn-inc').className = tipo === 'INC'
+    ? 'btn btn-cm-red flex-grow-1' : 'btn btn-outline-secondary flex-grow-1';
+  document.getElementById('red-btn-req').className = tipo === 'REQ'
+    ? 'btn btn-cm-red flex-grow-1' : 'btn btn-outline-secondary flex-grow-1';
+  redValidarTicket();
+}
+
+function redValidarTicket() {
+  const num = document.getElementById('red-ticket-num').value.replace(/\D/g,'');
+  document.getElementById('red-ticket-num').value = num;
+  const ico = document.getElementById('red-ticket-icon').querySelector('i');
+  const fb  = document.getElementById('red-ticket-feedback');
+  if (!num) { ico.className = 'bi bi-dash text-muted'; fb.textContent = ''; return; }
+  if (num.length < 8) {
+    ico.className = 'bi bi-x-circle text-danger';
+    fb.className  = 'form-text text-danger';
+    fb.textContent = num.length + '/8 dígitos';
+  } else {
+    ico.className = 'bi bi-check-circle-fill text-success';
+    fb.className  = 'form-text text-success';
+    fb.textContent = 'Ticket: ' + redTipoTicket + num;
+  }
+}
+
+function redGetTicket() {
+  const num = document.getElementById('red-ticket-num').value;
+  return num.length === 8 ? redTipoTicket + num : null;
+}
+
+// Búsqueda por SN — auto-dispara si parece pistola escáner
+let _rNsBurst = 0, _rNsLast = 0;
+document.getElementById('red-ns').addEventListener('input', () => {
+  const now = Date.now();
+  _rNsBurst = (now - _rNsLast < 60) ? _rNsBurst + 1 : 1;
+  _rNsLast  = now;
+  if (_rNsBurst >= 4) setTimeout(redBuscar, 80);
+});
+document.getElementById('red-ns').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); redBuscar(); }
+});
+document.getElementById('red-mac').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); redBuscar(); }
+});
+
+async function redBuscar() {
+  const ns  = document.getElementById('red-ns').value.trim();
+  const mac = document.getElementById('red-mac').value.trim();
+  const fb  = document.getElementById('red-busqueda-feedback');
+
+  if (!ns && !mac) {
+    fb.innerHTML = '<div class="alert alert-warning py-2 mb-0">Introduce el SN o la MAC</div>';
+    return;
+  }
+
+  fb.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>Buscando…</div>';
+
+  const params = new URLSearchParams({ tipo: tipoActual, ns, mac });
+  const r = await _fetch('/retiradas/buscar_red?' + params);
+  const d = await r.json();
+
+  if (!d.ok) {
+    fb.innerHTML = '<div class="alert alert-danger py-2 mb-0"><i class="bi bi-x-circle me-1"></i>' + d.error + '</div>';
+    return;
+  }
+
+  fb.innerHTML = '';
+  redEquipoActual = d.equipo;
+
+  // Auto-foco al ticket tras encontrar equipo (DNI ya identificado)
+  setTimeout(() => document.getElementById('red-ticket-num').focus(), 100);
+
+  // Nombre del dispositivo según tipo
+  const nombre = tipoActual === 'telefono'
+    ? 'Extensión ' + (d.equipo.extension || '—') + ' · ' + (d.equipo.modelo || '')
+    : (d.equipo.nombre || 'AP sin nombre') + ' · ' + (d.equipo.modelo || '');
+
+  document.getElementById('red-res-nombre').textContent = nombre;
+  document.getElementById('red-res-detalle').innerHTML  =
+    'SN: <strong>' + (d.equipo.ns  || '—') + '</strong> &nbsp;|&nbsp; ' +
+    'MAC: <strong>' + (d.equipo.mac || '—') + '</strong> &nbsp;|&nbsp; ' +
+    'IP: ' + (d.equipo.ip  || '—');
+
+  const badgeEl = document.getElementById('red-res-estado');
+  badgeEl.textContent = d.equipo.estado || 'activo';
+  badgeEl.className   = 'badge ' + (d.equipo.estado === 'retirado' ? 'bg-secondary' : 'bg-success');
+
+  // Auto-rellenar MAC si se buscó por SN
+  if (!mac && d.equipo.mac) document.getElementById('red-mac').value = d.equipo.mac;
+
+  document.getElementById('red-card-resultado').classList.remove('d-none');
+}
+
+function redLimpiarBusqueda() {
+  redEquipoActual = null;
+  document.getElementById('red-ns').value  = '';
+  document.getElementById('red-mac').value = '';
+  document.getElementById('red-busqueda-feedback').innerHTML = '';
+  document.getElementById('red-card-resultado').classList.add('d-none');
+  document.getElementById('red-ns').focus();
+}
+
+async function redConfirmar() {
+  const ticket    = redGetTicket();
+  const ubicacion = document.getElementById('red-ubicacion').value.trim();
+  const dni       = CURRENT_DNI;
+
+  if (!ticket)    { toast('El ticket debe tener 8 dígitos', 'warning'); document.getElementById('red-ticket-num').focus(); return; }
+  if (!ubicacion) { toast('Indica la ubicación física de salida', 'warning'); document.getElementById('red-ubicacion').focus(); return; }
+  if (!redEquipoActual) { toast('Busca el dispositivo primero', 'warning'); return; }
+
+  const confirmado = await sisdahConfirm(
+    `¿Confirmar retirada de ${tipoActual === 'telefono' ? 'teléfono' : 'AP WiFi'}?\nTicket: ${ticket}`,
+    { title: 'Confirmar retirada', btnText: 'Retirar', icon: 'bi-box-arrow-right' }
+  );
+  if (!confirmado) return;
+
+  const r = await _fetch('/retiradas/confirmar_red', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      tipo     : tipoActual,
+      id       : redEquipoActual.id,
+      ns       : document.getElementById('red-ns').value.trim(),
+      mac      : document.getElementById('red-mac').value.trim(),
+      ubicacion,
+      ticket,
+      dni
+    })
+  });
+  const d = await r.json();
+  if (d.ok) {
+    toast('✓ Retirada registrada: ' + d.label, 'success', 4000);
+    redLimpiarBusqueda();
+    // Limpiar campos de paso 2
+    document.getElementById('red-ticket-num').value = '';
+    document.getElementById('red-ubicacion').value  = '';
+    document.getElementById('red-ticket-feedback').innerHTML = '&nbsp;';
+  } else {
+    toast('Error: ' + (d.error || 'desconocido'), 'danger');
+  }
+}
+</script>
+{% endblock %}

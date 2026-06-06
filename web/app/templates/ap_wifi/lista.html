@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+{% block title %}AP WiFi{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-wifi icon-title"></i>Puntos de Acceso WiFi</h4>
+  {% if current_user.es_gestor %}
+  <button class="btn btn-cm-red btn-sm" onclick="abrirModal()">
+    <i class="bi bi-plus-circle me-1"></i>Nuevo AP
+  </button>
+  {% endif %}
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="GET" class="row g-2">
+      <div class="col-md-4">
+        <input type="text" name="q" value="{{ q }}" class="form-control"
+               placeholder="Nombre, NS, MAC, IP, servicio…">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-cm-red"><i class="bi bi-search"></i></button>
+        <a href="{{ url_for('ap_wifi.lista') }}" class="btn btn-outline-secondary">Limpiar</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0">
+      <thead>
+        <tr>
+          <th class="ps-3">Nombre / Ref.</th>
+          <th>Modelo</th>
+          <th>NS</th>
+          <th>MAC</th>
+          <th>IP</th>
+          <th>Servicio</th>
+          <th>Ubicación</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in aps %}
+        <tr id="ap-{{ a.id }}">
+          <td class="ps-3 font-monospace fw-bold text-cm-red">{{ a.nombre or '—' }}</td>
+          <td>{{ a.modelo or '—' }}</td>
+          <td class="font-monospace small">{{ a.ns or '—' }}</td>
+          <td class="font-monospace small">{{ a.mac or '—' }}</td>
+          <td class="font-monospace small">{{ a.ip or '—' }}</td>
+          <td><span class="badge bg-light text-dark border">{{ a.servicio or '—' }}</span></td>
+          <td class="small">
+            {% if a.ubicacion_rel %}
+              <span class="badge" style="background:var(--cm-blue-light);color:var(--cm-blue)">
+                <i class="bi bi-geo-alt me-1"></i>{{ a.ubicacion_rel.edificio }}
+              </span>
+              <span class="text-muted small ms-1">{{ a.ubicacion_rel.planta }}{% if a.ubicacion_rel.zona %} · {{ a.ubicacion_rel.zona }}{% endif %}</span>
+            {% else %}
+              {{ a.ubicacion_libre or '—' }}
+            {% endif %}
+          </td>
+          <td>
+            {% if a.estado=='activo' %}<span class="badge badge-estado-stock">activo</span>
+            {% elif a.estado=='averia' %}<span class="badge badge-estado-averia">avería</span>
+            {% else %}<span class="badge bg-light text-dark border">{{ a.estado }}</span>{% endif %}
+          </td>
+          <td>
+            <button class="btn btn-outline-secondary btn-sm py-0" onclick='editarAP({{ a.to_dict()|tojson }})'>
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-outline-danger btn-sm py-0 ms-1" onclick="eliminar({{ a.id }})">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-4">Sin puntos de acceso registrados</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ Modal AP WiFi ══════════════════════════════════════════ -->
+<div class="modal fade" id="modalAP" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:var(--cm-red-light);border-bottom:1px solid rgba(200,16,46,.15)">
+        <h5 class="modal-title fw-bold text-cm-red">
+          <i class="bi bi-wifi me-2"></i><span id="modal-ap-titulo">Nuevo AP WiFi</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="ap-id">
+        <div class="row g-3">
+
+          <div class="col-12"><p class="section-label">Identificación</p></div>
+          <div class="col-md-4">
+            <label class="form-label">Nombre / Referencia</label>
+            <input id="ap-nombre" class="form-control font-monospace" placeholder="AP-P1-Sala3">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Modelo</label>
+            <input id="ap-modelo" class="form-control" placeholder="Cisco Catalyst 9105">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Estado</label>
+            <select id="ap-est" class="form-select">
+              <option value="activo">Activo</option>
+              <option value="inactivo">Inactivo</option>
+              <option value="averia">Avería</option>
+            </select>
+          </div>
+
+          <div class="col-12"><p class="section-label">Red</p></div>
+          <div class="col-md-4">
+            <label class="form-label">NS (N.º Serie)</label>
+            <input id="ap-ns" class="form-control font-monospace" placeholder="FCH1234ABCD">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">MAC</label>
+            <input id="ap-mac" class="form-control font-monospace" placeholder="AA:BB:CC:DD:EE:FF">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">IP</label>
+            <input id="ap-ip" class="form-control font-monospace" placeholder="10.0.0.1">
+          </div>
+
+          <div class="col-12"><p class="section-label">Destino</p></div>
+          <div class="col-md-12">
+            <label class="form-label">Servicio / Área cubierta</label>
+            <input id="ap-servicio" class="form-control" placeholder="UCI, Urgencias, Admisión…">
+          </div>
+
+          <div class="col-12"><p class="section-label">Ubicación física</p></div>
+          <div class="col-md-4">
+            <label class="form-label">Edificio</label>
+            <select id="ap-edificio" class="form-select" onchange="filtrarPlantas('ap')">
+              <option value="">— Selecciona edificio —</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Planta</label>
+            <select id="ap-planta" class="form-select" onchange="seleccionarLocalizacion('ap')">
+              <option value="">— Selecciona planta —</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Zona <span class="text-muted small">(opcional)</span></label>
+            <input id="ap-zona" class="form-control" placeholder="Sala 3…" readonly>
+          </div>
+          <input type="hidden" id="ap-loc-id">
+
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="chk-ap-libre"
+                     onchange="toggleUbicacionLibre('ap')">
+              <label class="form-check-label text-muted small" for="chk-ap-libre">
+                Ubicación no está en el catálogo — escribir manualmente
+              </label>
+            </div>
+            <input id="ap-ubi-libre" class="form-control mt-2 d-none"
+                   placeholder="Describe la ubicación manualmente">
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Notas</label>
+            <textarea id="ap-not" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-cm-red" onclick="guardarAP()">
+          <i class="bi bi-check-circle me-1"></i>Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let localizaciones = {{ localizaciones | map(attribute='to_dict') | list | tojson }};
+const modalAP = new bootstrap.Modal(document.getElementById('modalAP'));
+
+function poblarEdificios(prefix) {
+  const edificios = [...new Set(localizaciones.map(l => l.edificio))].sort();
+  const sel = document.getElementById(prefix + '-edificio');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— Selecciona edificio —</option>';
+  edificios.forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = opt.textContent = e;
+    if (e === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function filtrarPlantas(prefix) {
+  const edificio = document.getElementById(prefix + '-edificio').value;
+  const plantas = localizaciones.filter(l => l.edificio === edificio)
+    .sort((a, b) => a.planta.localeCompare(b.planta));
+  const sel = document.getElementById(prefix + '-planta');
+  sel.innerHTML = '<option value="">— Selecciona planta —</option>';
+  plantas.forEach(l => {
+    const opt = document.createElement('option');
+    opt.value = l.id;
+    opt.textContent = l.planta + (l.zona ? ' · ' + l.zona : '');
+    sel.appendChild(opt);
+  });
+  document.getElementById(prefix + '-loc-id').value = '';
+  document.getElementById(prefix + '-zona').value = '';
+}
+
+function seleccionarLocalizacion(prefix) {
+  const pid = document.getElementById(prefix + '-planta').value;
+  const loc = localizaciones.find(l => l.id == pid);
+  document.getElementById(prefix + '-loc-id').value = pid || '';
+  document.getElementById(prefix + '-zona').value = loc?.zona || '';
+}
+
+function toggleUbicacionLibre(prefix) {
+  const libre = document.getElementById('chk-' + prefix + '-libre').checked;
+  document.getElementById(prefix + '-edificio').disabled = libre;
+  document.getElementById(prefix + '-planta').disabled = libre;
+  document.getElementById(prefix + '-zona').disabled = libre;
+  document.getElementById(prefix + '-ubi-libre').classList.toggle('d-none', !libre);
+  if (libre) document.getElementById(prefix + '-loc-id').value = '';
+}
+
+function abrirModal() {
+  ['ap-id','ap-nombre','ap-modelo','ap-ns','ap-mac','ap-ip',
+   'ap-servicio','ap-not','ap-ubi-libre'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('ap-est').value = 'activo';
+  document.getElementById('ap-loc-id').value = '';
+  document.getElementById('chk-ap-libre').checked = false;
+  document.getElementById('ap-ubi-libre').classList.add('d-none');
+  document.getElementById('modal-ap-titulo').textContent = 'Nuevo AP WiFi';
+  poblarEdificios('ap');
+  filtrarPlantas('ap');
+  modalAP.show();
+  setTimeout(() => document.getElementById('ap-nombre').focus(), 300);
+}
+
+function editarAP(a) {
+  document.getElementById('ap-id').value      = a.id;
+  document.getElementById('ap-nombre').value  = a.nombre || '';
+  document.getElementById('ap-modelo').value  = a.modelo || '';
+  document.getElementById('ap-ns').value      = a.ns || '';
+  document.getElementById('ap-mac').value     = a.mac || '';
+  document.getElementById('ap-ip').value      = a.ip || '';
+  document.getElementById('ap-servicio').value= a.servicio || '';
+  document.getElementById('ap-est').value     = a.estado || 'activo';
+  document.getElementById('ap-not').value     = a.notas || '';
+  document.getElementById('modal-ap-titulo').textContent = 'Editar AP WiFi';
+
+  poblarEdificios('ap');
+  if (a.ubicacion_id) {
+    const loc = localizaciones.find(l => l.id == a.ubicacion_id);
+    if (loc) {
+      document.getElementById('ap-edificio').value = loc.edificio;
+      filtrarPlantas('ap');
+      document.getElementById('ap-planta').value = a.ubicacion_id;
+      document.getElementById('ap-loc-id').value = a.ubicacion_id;
+      document.getElementById('ap-zona').value = loc.zona || '';
+    }
+    document.getElementById('chk-ap-libre').checked = false;
+    document.getElementById('ap-ubi-libre').classList.add('d-none');
+  } else if (a.ubicacion_libre) {
+    document.getElementById('chk-ap-libre').checked = true;
+    document.getElementById('ap-ubi-libre').value = a.ubicacion_libre;
+    document.getElementById('ap-ubi-libre').classList.remove('d-none');
+    document.getElementById('ap-edificio').disabled = true;
+    document.getElementById('ap-planta').disabled = true;
+  }
+  modalAP.show();
+}
+
+async function guardarAP() {
+  const libre = document.getElementById('chk-ap-libre').checked;
+  const payload = {
+    id:              document.getElementById('ap-id').value || null,
+    nombre:          document.getElementById('ap-nombre').value.trim(),
+    modelo:          document.getElementById('ap-modelo').value.trim(),
+    ns:              document.getElementById('ap-ns').value.trim(),
+    mac:             document.getElementById('ap-mac').value.trim(),
+    ip:              document.getElementById('ap-ip').value.trim(),
+    servicio:        document.getElementById('ap-servicio').value.trim(),
+    estado:          document.getElementById('ap-est').value,
+    notas:           document.getElementById('ap-not').value.trim(),
+    ubicacion_id:    libre ? null : (document.getElementById('ap-loc-id').value || null),
+    ubicacion_libre: libre ? document.getElementById('ap-ubi-libre').value.trim() : '',
+  };
+  const r = await _fetch('/ap-wifi/guardar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  });
+  const d = await r.json();
+  if (d.ok) { modalAP.hide(); location.reload(); }
+  else toast('Error: ' + d.error, 'danger');
+}
+
+async function eliminar(id) {
+  if (!await sisdahConfirm('¿Eliminar este punto de acceso WiFi?', {title:'Eliminar AP WiFi', btnText:'Eliminar'})) return;
+  const r = await _fetch(`/ap-wifi/eliminar/${id}`, {method:'POST'});
+  const d = await r.json();
+  if (d.ok) { document.getElementById(`ap-${id}`).remove(); toast('AP eliminado','success'); }
+}
+</script>
+{% endblock %}

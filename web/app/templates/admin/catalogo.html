@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+{% block title %}Catálogo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-tags icon-title"></i>Catálogo de equipos</h4>
+  <span class="text-muted small">{{ total }} entrada{{ 's' if total != 1 }}</span>
+</div>
+
+<p class="text-muted small mb-4">
+  <i class="bi bi-info-circle me-1"></i>
+  Cada entrada define una combinación Sección + Marca + Modelo disponible al registrar equipos.
+</p>
+
+<!-- ── Formulario de alta ─────────────────────────────────── -->
+<div class="card mb-4">
+  <div class="card-header fw-semibold">
+    <i class="bi bi-plus-circle me-2 text-cm-red"></i>Añadir nuevo modelo
+  </div>
+  <div class="card-body">
+    <div class="row g-3 align-items-end">
+
+      <!-- Sección -->
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Sección <span class="text-cm-red">*</span></label>
+        <select id="f-seccion" class="form-select" onchange="onSeccionChange()">
+          <option value="">— Selecciona sección —</option>
+          {% for s in tree_marcas.keys() %}
+          <option value="{{ s }}">{{ s }}</option>
+          {% endfor %}
+          <option value="__nueva__">＋ Nueva sección…</option>
+        </select>
+        <input id="f-seccion-nueva" class="form-control mt-2 text-uppercase d-none"
+               placeholder="Nombre de la nueva sección" autocomplete="off">
+      </div>
+
+      <!-- Marca -->
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Marca <span class="text-cm-red">*</span></label>
+        <select id="f-marca" class="form-select" onchange="onMarcaChange()">
+          <option value="">— Selecciona marca —</option>
+          <option value="__nueva__">＋ Nueva marca…</option>
+        </select>
+        <input id="f-marca-nueva" class="form-control mt-2 text-uppercase d-none"
+               placeholder="Nombre de la nueva marca" autocomplete="off">
+      </div>
+
+      <!-- Modelo -->
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Modelo <span class="text-cm-red">*</span></label>
+        <input id="f-modelo" class="form-control"
+               placeholder="ThinkPad L14 Gen4, LaserJet M404dn…" autocomplete="off">
+      </div>
+
+      <div class="col-md-2">
+        <button class="btn btn-cm-red w-100" onclick="añadir()">
+          <i class="bi bi-plus-lg me-1"></i>Añadir
+        </button>
+      </div>
+    </div>
+    <div id="form-error" class="text-danger small mt-2" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ── Filtro + tabla agrupada ───────────────────────────── -->
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-table me-2 text-cm-red"></i>Entradas del catálogo</span>
+    <div class="input-group input-group-sm" style="width:240px">
+      <span class="input-group-text"><i class="bi bi-search"></i></span>
+      <input type="text" id="filtro" class="form-control" placeholder="Filtrar…"
+             oninput="filtrar()">
+    </div>
+  </div>
+  <div class="table-responsive" style="max-height:560px;overflow-y:auto">
+    <table class="table table-hover table-sm mb-0" id="tabla-cat">
+      <thead class="sticky-top-header">
+        <tr>
+          <th class="ps-3" style="width:28%">Marca</th>
+          <th>Modelo</th>
+          <th style="width:56px"></th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        {% set ns = namespace(cur_sec='') %}
+        {% for it in items %}
+          {% if it.seccion != ns.cur_sec %}
+            {% set ns.cur_sec = it.seccion %}
+            <tr class="sec-header" data-sec="{{ it.seccion }}">
+              <td colspan="3" class="ps-3 py-2"
+                  style="background:#F7F8FA;border-top:2px solid #E4E7EC">
+                <strong style="color:var(--cm-red);font-size:.85rem;letter-spacing:.04em">
+                  <i class="bi bi-folder2-open me-2"></i>{{ it.seccion }}
+                </strong>
+              </td>
+            </tr>
+          {% endif %}
+          <tr id="row-{{ it.id }}" data-sec="{{ it.seccion }}"
+              data-txt="{{ it.seccion }} {{ it.marca }} {{ it.modelo }}">
+            <td class="ps-3 fw-semibold small">{{ it.marca }}</td>
+            <td class="small">{{ it.modelo }}</td>
+            <td class="text-end pe-3">
+              <button class="btn btn-outline-danger btn-sm py-0 px-2"
+                      onclick="eliminar({{ it.id }},'{{ it.marca|replace("'","\\'") }}','{{ it.modelo|replace("'","\\'") }}')"
+                      title="Eliminar">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </td>
+          </tr>
+        {% else %}
+          <tr id="row-vacio">
+            <td colspan="3" class="text-center text-muted py-4 fst-italic">
+              El catálogo está vacío — añade la primera entrada arriba.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Mapa sección → [marcas] pasado desde el servidor
+const TREE = {{ tree_marcas | tojson }};
+
+// ── Selects en cascada ───────────────────────────────────────────
+function onSeccionChange() {
+  const sel     = document.getElementById('f-seccion').value;
+  const inputNv = document.getElementById('f-seccion-nueva');
+  const esNueva = sel === '__nueva__';
+  inputNv.classList.toggle('d-none', !esNueva);
+  if (esNueva) { inputNv.focus(); }
+
+  // Repoblar marcas según sección
+  const mSel = document.getElementById('f-marca');
+  const mNv  = document.getElementById('f-marca-nueva');
+  mSel.innerHTML = '<option value="">— Selecciona marca —</option>';
+  mNv.classList.add('d-none');
+
+  const marcas = (esNueva ? [] : (TREE[sel] || []));
+  marcas.forEach(m => {
+    mSel.insertAdjacentHTML('beforeend', `<option value="${m}">${m}</option>`);
+  });
+  mSel.insertAdjacentHTML('beforeend', '<option value="__nueva__">＋ Nueva marca…</option>');
+}
+
+function onMarcaChange() {
+  const sel  = document.getElementById('f-marca').value;
+  const esNv = sel === '__nueva__';
+  document.getElementById('f-marca-nueva').classList.toggle('d-none', !esNv);
+  if (esNv) document.getElementById('f-marca-nueva').focus();
+}
+
+// ── Filtro ───────────────────────────────────────────────────────
+function filtrar() {
+  const q = document.getElementById('filtro').value.toLowerCase();
+  let ultimaSecVisible = null;
+
+  // Ocultar/mostrar filas de datos
+  document.querySelectorAll('#tbody tr[id^="row-"]').forEach(tr => {
+    const txt     = (tr.dataset.txt || '').toLowerCase();
+    const visible = txt.includes(q);
+    tr.style.display = visible ? '' : 'none';
+    if (visible) ultimaSecVisible = tr.dataset.sec;
+  });
+
+  // Mostrar cabeceras de sección solo si tienen filas visibles
+  document.querySelectorAll('#tbody tr.sec-header').forEach(hdr => {
+    const sec = hdr.dataset.sec;
+    const tieneVisibles = [...document.querySelectorAll(`#tbody tr[data-sec="${sec}"][id^="row-"]`)]
+      .some(r => r.style.display !== 'none');
+    hdr.style.display = tieneVisibles ? '' : 'none';
+  });
+}
+
+// ── Añadir ───────────────────────────────────────────────────────
+function getValorCampo(selId, inputId) {
+  const sel = document.getElementById(selId);
+  if (sel.value === '__nueva__') return document.getElementById(inputId).value.trim().toUpperCase();
+  return sel.value;
+}
+
+async function añadir() {
+  const seccion = getValorCampo('f-seccion', 'f-seccion-nueva');
+  const marca   = getValorCampo('f-marca',   'f-marca-nueva');
+  const modelo  = document.getElementById('f-modelo').value.trim();
+  const errEl   = document.getElementById('form-error');
+
+  errEl.style.display = 'none';
+  if (!seccion || !marca || !modelo) {
+    errEl.textContent = 'Los tres campos son obligatorios.';
+    errEl.style.display = '';
+    return;
+  }
+
+  const r = await _fetch('/catalogo/modelo/add', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ seccion, marca, modelo })
+  });
+  const d = await r.json();
+  if (!d.ok) { errEl.textContent = d.error; errEl.style.display = ''; return; }
+
+  // Limpiar campo modelo
+  document.getElementById('f-modelo').value = '';
+
+  // Actualizar TREE local si es nueva sección/marca
+  if (!TREE[seccion]) {
+    TREE[seccion] = [];
+    // Añadir al select de sección
+    const sOpt = document.createElement('option');
+    sOpt.value = seccion; sOpt.textContent = seccion;
+    const sNv = document.querySelector('#f-seccion option[value="__nueva__"]');
+    document.getElementById('f-seccion').insertBefore(sOpt, sNv);
+    document.getElementById('f-seccion').value = seccion;
+  }
+  if (!TREE[seccion].includes(marca)) {
+    TREE[seccion].push(marca);
+    TREE[seccion].sort();
+    onSeccionChange(); // repoblar marcas
+    document.getElementById('f-marca').value = marca;
+    document.getElementById('f-marca-nueva').classList.add('d-none');
+  }
+  // Resetear campos "nueva"
+  document.getElementById('f-seccion-nueva').classList.add('d-none');
+  document.getElementById('f-seccion-nueva').value = '';
+  document.getElementById('f-marca-nueva').classList.add('d-none');
+  document.getElementById('f-marca-nueva').value = '';
+
+  // Insertar fila en tabla
+  const tbody = document.getElementById('tbody');
+  tbody.querySelector('#row-vacio')?.remove();
+
+  // Buscar o crear cabecera de sección
+  let secHdr = [...tbody.querySelectorAll('tr.sec-header')]
+    .find(h => h.dataset.sec === seccion);
+
+  if (!secHdr) {
+    // Añadir cabecera de sección en orden
+    secHdr = document.createElement('tr');
+    secHdr.className = 'sec-header';
+    secHdr.dataset.sec = seccion;
+    secHdr.innerHTML = `<td colspan="3" class="ps-3 py-2"
+        style="background:#F7F8FA;border-top:2px solid #E4E7EC">
+      <strong style="color:var(--cm-red);font-size:.85rem;letter-spacing:.04em">
+        <i class="bi bi-folder2-open me-2"></i>${seccion}
+      </strong></td>`;
+    const hdrs = [...tbody.querySelectorAll('tr.sec-header')];
+    const sigte = hdrs.find(h => h.dataset.sec > seccion);
+    sigte ? tbody.insertBefore(secHdr, sigte) : tbody.appendChild(secHdr);
+  }
+
+  // Insertar fila de datos tras la cabecera de sección, en orden
+  const tr = document.createElement('tr');
+  tr.id = 'row-' + d.id;
+  tr.dataset.sec = seccion;
+  tr.dataset.txt = `${seccion} ${marca} ${modelo}`;
+  tr.innerHTML = `
+    <td class="ps-3 fw-semibold small">${marca}</td>
+    <td class="small">${modelo}</td>
+    <td class="text-end pe-3">
+      <button class="btn btn-outline-danger btn-sm py-0 px-2"
+              onclick="eliminar(${d.id},'${marca.replace(/'/g,"\\'")}','${modelo.replace(/'/g,"\\'")}')"
+              title="Eliminar">
+        <i class="bi bi-trash3"></i>
+      </button>
+    </td>`;
+
+  // Insertar en orden dentro de la sección
+  const filasSeccion = [...tbody.querySelectorAll(`tr[data-sec="${seccion}"][id^="row-"]`)];
+  const clave = `${marca} ${modelo}`.toLowerCase();
+  const sigteF = filasSeccion.find(f =>
+    `${f.children[0].textContent.trim()} ${f.children[1].textContent.trim()}`.toLowerCase() > clave
+  );
+  if (sigteF) tbody.insertBefore(tr, sigteF);
+  else {
+    // Insertar antes de la siguiente cabecera de sección
+    const hdrs = [...tbody.querySelectorAll('tr.sec-header')];
+    const sigteHdr = hdrs.find(h => h.dataset.sec > seccion);
+    sigteHdr ? tbody.insertBefore(tr, sigteHdr) : tbody.appendChild(tr);
+  }
+
+  toast(`Añadido: ${seccion} › ${marca} › ${modelo}`, 'success');
+}
+
+// ── Eliminar ─────────────────────────────────────────────────────
+async function eliminar(id, marca, modelo) {
+  if (!await sisdahConfirm(`¿Eliminar "${marca} — ${modelo}" del catálogo?`,
+    { title: 'Eliminar modelo', btnText: 'Eliminar', icon: 'bi-tags' })) return;
+
+  const r = await _fetch(`/catalogo/modelo/del/${id}`, { method: 'POST' });
+  const d = await r.json();
+  if (!d.ok) { toast('Error al eliminar', 'danger'); return; }
+
+  const row = document.getElementById('row-' + id);
+  const sec = row?.dataset.sec;
+  row?.remove();
+
+  // Si no quedan filas en esa sección, quitar su cabecera
+  if (sec) {
+    const quedan = document.querySelectorAll(`#tbody tr[data-sec="${sec}"][id^="row-"]`);
+    if (!quedan.length) {
+      document.querySelector(`#tbody tr.sec-header[data-sec="${sec}"]`)?.remove();
+    }
+  }
+
+  if (!document.querySelector('#tbody tr[id^="row-"]')) {
+    document.getElementById('tbody').innerHTML =
+      '<tr id="row-vacio"><td colspan="3" class="text-center text-muted py-4 fst-italic">' +
+      'El catálogo está vacío — añade la primera entrada arriba.</td></tr>';
+  }
+  toast('Entrada eliminada', 'success');
+}
+
+// Enter en modelo → añadir
+document.getElementById('f-modelo').addEventListener('keydown', e => {
+  if (e.key === 'Enter') añadir();
+});
+</script>
+{% endblock %}

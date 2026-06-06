@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block title %}Gestión de usuarios{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-people icon-title"></i>Gestión de usuarios</h4>
+  <button class="btn btn-cm-red btn-sm" onclick="mostrarFormNuevo()">
+    <i class="bi bi-person-plus me-1"></i>Nuevo usuario
+  </button>
+</div>
+
+<!-- Form nuevo usuario (colapsable) -->
+<div class="card mb-3 d-none" id="form-nuevo">
+  <div class="card-header"><i class="bi bi-person-plus me-2 text-cm-red"></i>Crear nuevo usuario</div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-2">
+        <label class="form-label">DNI *</label>
+        <input type="text" id="new-dni" class="form-control font-monospace"
+               placeholder="12345678A" oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Nombre completo *</label>
+        <input type="text" id="new-nombre" class="form-control">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Correo electrónico</label>
+        <input type="email" id="new-email" class="form-control" placeholder="usuario@hgugm.es">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Rol</label>
+        <select id="new-rol" class="form-select" onchange="togglePass()">
+          <option value="tecnico">Técnico (solo DNI)</option>
+          <option value="gestor_n1">Gestor N1</option>
+          <option value="gestor_n3">Administrador N3</option>
+          <option value="developer">Desarrollador</option>
+        </select>
+      </div>
+      <div class="col-md-3 d-none" id="new-pass-group">
+        <label class="form-label">Contraseña inicial *</label>
+        <input type="password" id="new-password" class="form-control">
+      </div>
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-cm-red" onclick="crearUsuario()">
+          <i class="bi bi-check-circle me-1"></i>Crear usuario
+        </button>
+        <button class="btn btn-outline-secondary"
+                onclick="document.getElementById('form-nuevo').classList.add('d-none')">
+          Cancelar
+        </button>
+      </div>
+    </div>
+    <div id="crear-fb" class="mt-2"></div>
+  </div>
+</div>
+
+<!-- Tabla usuarios -->
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-people me-2 text-cm-red"></i>Usuarios registrados</span>
+    <span class="badge bg-cm-red">{{ usuarios|length }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0 align-middle">
+      <thead>
+        <tr>
+          <th class="ps-3">DNI</th>
+          <th>Nombre</th>
+          <th>Correo</th>
+          <th>Rol actual</th>
+          <th>Alta</th>
+          <th>Activo</th>
+          <th style="min-width:360px">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in usuarios %}
+        <tr id="row-{{ u.id }}">
+          <td class="ps-3 font-monospace fw-bold">{{ u.dni }}</td>
+          <td>{{ u.nombre }}</td>
+          <td class="small text-muted">{{ u.email or '—' }}</td>
+          <td>
+            {% if u.rol == 'tecnico' %}
+              <span class="badge bg-light text-dark border">Técnico</span>
+            {% elif u.rol == 'gestor_n1' %}
+              <span class="badge badge-estado-reservado">Gestor N1</span>
+            {% elif u.rol == 'gestor_n3' %}
+              <span class="badge bg-cm-red">Admin N3</span>
+            {% elif u.rol == 'developer' %}
+              <span class="badge" style="background:#6f42c1">Desarrollador</span>
+            {% else %}
+              <span class="badge bg-secondary">{{ u.rol }}</span>
+            {% endif %}
+          </td>
+          <td class="small text-muted">{{ u.creado_en.strftime('%d/%m/%Y') if u.creado_en else '—' }}</td>
+          <td>
+            {% if u.activo %}
+              <span class="badge badge-estado-stock">Sí</span>
+            {% else %}
+              <span class="badge bg-light text-dark border">No</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="d-flex gap-1 align-items-center flex-wrap">
+              <!-- Selector de rol -->
+              <select class="form-select form-select-sm" id="rol-{{ u.id }}"
+                      style="min-width:150px;font-size:.8rem">
+                <option value="tecnico"    {% if u.rol=='tecnico'    %}selected{% endif %}>Técnico (solo DNI)</option>
+                <option value="gestor_n1"  {% if u.rol=='gestor_n1'  %}selected{% endif %}>Gestor N1</option>
+                <option value="gestor_n3"  {% if u.rol=='gestor_n3'  %}selected{% endif %}>Admin N3</option>
+                <option value="developer"  {% if u.rol=='developer'  %}selected{% endif %}>Desarrollador</option>
+              </select>
+              <!-- Guardar rol -->
+              <button class="btn btn-outline-cm-red btn-sm px-2" title="Guardar rol"
+                      onclick="cambiarRol({{ u.id }})">
+                <i class="bi bi-check-lg"></i>
+              </button>
+              <!-- Cambiar contraseña -->
+              <button class="btn btn-outline-secondary btn-sm px-2" title="Cambiar contraseña"
+                      onclick="cambiarPass({{ u.id }})">
+                <i class="bi bi-key"></i>
+              </button>
+              <!-- Activar / Desactivar -->
+              <button class="btn btn-outline-{{ 'warning' if u.activo else 'success' }} btn-sm px-2"
+                      title="{{ 'Desactivar' if u.activo else 'Activar' }}"
+                      onclick="toggleActivo({{ u.id }}, {{ u.activo|lower }})">
+                <i class="bi bi-{{ 'person-dash' if u.activo else 'person-check' }}"></i>
+              </button>
+              <!-- Eliminar definitivamente -->
+              {% if u.dni != current_user.dni %}
+              <button class="btn btn-outline-danger btn-sm px-2" title="Eliminar usuario"
+                      onclick="eliminarUsuario({{ u.id }}, '{{ u.nombre }}')">
+                <i class="bi bi-trash"></i>
+              </button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function mostrarFormNuevo() {
+  document.getElementById('form-nuevo').classList.remove('d-none');
+  document.getElementById('new-dni').focus();
+}
+function togglePass() {
+  const esTec = document.getElementById('new-rol').value === 'tecnico';
+  document.getElementById('new-pass-group').classList.toggle('d-none', esTec);
+}
+
+async function crearUsuario() {
+  const fb  = document.getElementById('crear-fb');
+  const rol = document.getElementById('new-rol').value;
+  const res = await _fetch('/admin/usuarios/crear', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      dni:      document.getElementById('new-dni').value.trim().toUpperCase(),
+      nombre:   document.getElementById('new-nombre').value.trim(),
+      email:    document.getElementById('new-email').value.trim(),
+      rol:      rol,
+      password: document.getElementById('new-password').value
+    })
+  });
+  const d = await res.json();
+  if (d.ok) {
+    fb.innerHTML = '<div class="alert alert-success py-2">✓ Usuario creado.</div>';
+    setTimeout(() => location.reload(), 1000);
+  } else {
+    fb.innerHTML = `<div class="alert alert-danger py-2">${d.error}</div>`;
+  }
+}
+
+async function cambiarRol(uid) {
+  const r = await _fetch(`/admin/usuarios/${uid}/rol`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({rol: document.getElementById(`rol-${uid}`).value})
+  });
+  const d = await r.json();
+  if (d.ok) {
+    const row = document.getElementById(`row-${uid}`);
+    row.style.outline = '2px solid #198754';
+    setTimeout(() => { row.style.outline = ''; location.reload(); }, 700);
+  }
+}
+
+async function cambiarPass(uid) {
+  const pwd = prompt('Nueva contraseña para este usuario:');
+  if (!pwd) return;
+  const r = await _fetch(`/admin/usuarios/${uid}/password`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({password: pwd})
+  });
+  const d = await r.json();
+  toast(d.ok ? '✓ Contraseña actualizada' : 'Error: ' + d.error, d.ok ? 'success' : 'danger');
+}
+
+async function toggleActivo(uid, activo) {
+  const accion = activo ? 'desactivar' : 'activar';
+  if (!await sisdahConfirm(`¿Seguro que quieres ${accion} este usuario?`, {
+    title: accion.charAt(0).toUpperCase() + accion.slice(1) + ' usuario',
+    btnText: accion.charAt(0).toUpperCase() + accion.slice(1),
+    btnClass: activo ? 'btn-danger' : 'btn-success'
+  })) return;
+  const r = await _fetch(`/admin/usuarios/${uid}/toggle`, {method: 'POST'});
+  const d = await r.json();
+  if (d.ok) location.reload();
+}
+
+async function eliminarUsuario(uid, nombre) {
+  if (!await sisdahConfirm(
+    `¿Eliminar definitivamente a <strong>${nombre}</strong>? Esta acción no se puede deshacer.`,
+    {title: 'Eliminar usuario', btnText: 'Eliminar', btnClass: 'btn-danger', icon: 'bi-trash'}
+  )) return;
+  const r = await _fetch(`/admin/usuarios/${uid}/eliminar`, {method: 'POST'});
+  const d = await r.json();
+  if (d.ok) {
+    document.getElementById(`row-${uid}`).remove();
+    toast('Usuario eliminado', 'success');
+  } else {
+    toast('Error: ' + d.error, 'danger');
+  }
+}
+</script>
+{% endblock %}

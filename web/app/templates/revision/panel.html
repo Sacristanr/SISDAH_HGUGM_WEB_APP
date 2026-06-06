@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% block title %}Revision{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-search icon-title"></i>Revision fisica de inventario</h4>
+  <div class="d-flex gap-2 align-items-center">
+    <span class="badge bg-cm-red" id="badge-ver">0</span> verificados /
+    <span class="badge bg-light text-dark border">{{ total }}</span> esperados
+  </div>
+</div>
+
+<div class="card mb-3"><div class="card-body py-2">
+  <form method="GET" class="row g-2 align-items-end">
+    <div class="col-md-2"><label class="form-label">Seccion</label>
+      <select name="seccion" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">Todas</option>
+        {% for s in secciones %}<option value="{{ s }}" {% if seccion_sel==s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select></div>
+    <div class="col-md-2"><label class="form-label">Marca</label>
+      <select name="marca" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">Todas</option>
+        {% for m in marcas %}<option value="{{ m }}" {% if marca_sel==m %}selected{% endif %}>{{ m }}</option>{% endfor %}
+      </select></div>
+    {% if modelos %}
+    <div class="col-md-2"><label class="form-label">Modelo</label>
+      <select name="modelo" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">Todos</option>
+        {% for m in modelos %}<option value="{{ m }}" {% if modelo_sel==m %}selected{% endif %}>{{ m }}</option>{% endfor %}
+      </select></div>
+    {% endif %}
+    <div class="col-auto"><a href="/revision/" class="btn btn-outline-secondary btn-sm">Limpiar</a></div>
+  </form>
+</div></div>
+
+<div class="progress mb-3" style="height:8px">
+  <div id="barra-prog" class="progress-bar bg-cm-red" style="width:0%;transition:width .4s"></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-upc-scan me-2 text-cm-red"></i>Escaner</div>
+      <div class="card-body">
+        <div class="input-group mb-2">
+          <span class="input-group-text bg-cm-red text-white border-cm-red"><i class="bi bi-upc-scan"></i></span>
+          <input type="text" id="inp-scan" class="form-control form-control-lg font-monospace"
+                 placeholder="Escanea el ICM..." autocomplete="off" autofocus>
+        </div>
+        <div id="scan-feedback" class="small">&nbsp;</div>
+        <div class="d-flex gap-2 mt-3">
+          <button class="btn btn-outline-secondary btn-sm" onclick="deshacerUltimo()" id="btn-deshacer" disabled>
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Deshacer
+          </button>
+          <button class="btn btn-cm-red flex-grow-1" onclick="abrirCierre()" id="btn-cerrar" disabled>
+            <i class="bi bi-check2-all me-1"></i>Cerrar revision
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header d-flex justify-content-between">
+        <span><i class="bi bi-check-circle me-2 text-cm-red"></i>Verificados</span>
+        <span class="badge bg-cm-red" id="cnt-ver">0</span>
+      </div>
+      <div style="max-height:300px;overflow-y:auto">
+        <ul class="list-group list-group-flush" id="ul-verificados">
+          <li class="list-group-item text-center text-muted small py-3">Empieza a escanear...</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-2 text-cm-red"></i>Equipos esperados</span>
+        <div class="d-flex gap-2">
+          <span class="badge badge-estado-stock" id="cnt-ok">0</span>
+          <span class="badge bg-light text-dark border" id="cnt-pend">{{ total }} pendientes</span>
+        </div>
+      </div>
+      <div class="table-responsive" style="max-height:500px;overflow-y:auto">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="sticky-top-header">
+            <tr><th class="ps-3">ICM</th><th>Marca/Modelo</th><th>Seccion</th><th>Estado</th><th class="text-center">Rev.</th></tr>
+          </thead>
+          <tbody>
+            {% for eq in equipos %}
+            <tr id="eq-{{ eq.icm }}" data-icm="{{ eq.icm }}"
+                onclick="goFicha('{{ eq.icm }}')"
+                style="cursor:pointer" class="fila-equipo">
+              <td class="ps-3 font-monospace fw-bold text-cm-red">{{ eq.icm }}</td>
+              <td class="small">{{ eq.marca or "" }} {{ eq.modelo or "" }}</td>
+              <td><span class="badge bg-light text-dark border">{{ eq.seccion or "-" }}</span></td>
+              <td>
+                {% if eq.estado=="en stock" %}<span class="badge badge-estado-stock">stock</span>
+                {% elif eq.estado=="averia" %}<span class="badge badge-estado-averia">averia</span>
+                {% elif eq.ubicacion=="Ubicacion desconocida" %}
+                  <span class="badge" style="background:#FFF3E0;color:#E65100">ubic. desconocida</span>
+                {% else %}<span class="badge bg-light text-dark border">{{ eq.estado }}</span>{% endif %}
+              </td>
+              <td class="text-center" id="check-{{ eq.icm }}"><span class="text-muted">-</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalCierre" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header border-0">
+      <h5 class="modal-title fw-bold"><i class="bi bi-check2-all me-2 text-cm-red"></i>Cerrar revision</h5>
+      <button class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body">
+      <div class="row g-3 mb-3 text-center">
+        <div class="col-4"><div class="fw-bold text-success fs-3" id="res-ver">0</div><div class="text-muted small">Verificados</div></div>
+        <div class="col-4"><div class="fw-bold text-danger fs-3" id="res-no">0</div><div class="text-muted small">No escaneados</div></div>
+        <div class="col-4"><div class="fw-bold fs-3" id="res-total">0</div><div class="text-muted small">Total</div></div>
+      </div>
+      <div id="bloque-no-esc" class="d-none">
+        <div class="alert py-2 mb-2" style="background:#FFEBEE;color:#B71C1C;border:none">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          <strong id="txt-no-esc">0 equipos</strong> no fueron escaneados.
+        </div>
+        <div style="max-height:150px;overflow-y:auto;border:1px solid #ddd;border-radius:6px">
+          <table class="table table-sm mb-0">
+            <thead class="sticky-top-header"><tr><th class="ps-3">ICM</th><th>Marca/Modelo</th><th>Seccion</th></tr></thead>
+            <tbody id="tbody-no-esc"></tbody>
+          </table>
+        </div>
+        <div class="form-check mt-3">
+          <input class="form-check-input" type="checkbox" id="chk-desc" checked>
+          <label class="form-check-label fw-semibold" for="chk-desc">
+            Mover no escaneados a <span style="color:#E65100">Ubicacion desconocida</span>
+          </label>
+          <div class="text-muted small mt-1">
+            Quedaran en stock pero con ubicacion desconocida.
+            Si aparecen en futuras revisiones se restauraran automaticamente.
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer border-0">
+      <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+      <button class="btn btn-cm-red fw-bold" onclick="confirmarCierre()">
+        <i class="bi bi-check2-all me-1"></i>Confirmar cierre
+      </button>
+    </div>
+  </div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const TOTAL    = {{ total }};
+const ICM_LIST = {{ equipos | map(attribute='icm') | list | tojson }};
+const EQ_MAP   = {};
+{% for eq in equipos %}
+EQ_MAP['{{ eq.icm }}'] = {marca:'{{ eq.marca or "" }}',modelo:'{{ eq.modelo or "" }}',seccion:'{{ eq.seccion or "" }}'};
+{% endfor %}
+const verificados = new Set();
+let ultimoICM = null;
+const modalCierre = new bootstrap.Modal(document.getElementById('modalCierre'));
+const inp = document.getElementById('inp-scan');
+const fb  = document.getElementById('scan-feedback');
+let timer = null;
+
+function goFicha(icm) { window.location = '/inventario/' + icm; }
+
+inp.addEventListener('input', () => { clearTimeout(timer); if (!inp.value.trim()) return; timer = setTimeout(procesarScan, 80); });
+inp.addEventListener('keydown', e => { if (e.key==='Enter') { e.preventDefault(); clearTimeout(timer); procesarScan(); } });
+
+async function procesarScan() {
+  const icm = inp.value.trim().toUpperCase(); inp.value = '';
+  if (!icm || icm.length < 3) return;
+  if (verificados.has(icm)) { mostrarFb('Ya verificado: ' + icm, 'warning'); return; }
+  const r = await _fetch('/revision/verificar', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({icm})});
+  const d = await r.json();
+  if (d.ok) {
+    verificados.add(icm); ultimoICM = icm;
+    const row = document.getElementById('eq-'+icm);
+    if (row) row.style.background = '#F0FDF4';
+    const ch = document.getElementById('check-'+icm);
+    if (ch) ch.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i>';
+    const ul = document.getElementById('ul-verificados');
+    if (ul.querySelector('.text-muted')) ul.innerHTML = '';
+    ul.insertAdjacentHTML('afterbegin',
+      '<li class="list-group-item py-2 d-flex justify-content-between">' +
+      '<div><span class="font-monospace fw-bold small text-cm-red">' + icm + '</span>' +
+      '<br><span class="text-muted" style="font-size:.72rem">' + d.marca + ' ' + d.modelo +
+      (d.restaurado ? ' [RESTAURADO]' : '') + '</span></div>' +
+      '<i class="bi bi-check-circle-fill text-success"></i></li>');
+    mostrarFb((d.restaurado ? '[RESTAURADO] ' : '') + icm + ' - ' + d.marca + ' ' + d.modelo, 'success');
+    document.getElementById('btn-deshacer').disabled = false;
+    document.getElementById('btn-cerrar').disabled   = false;
+    actualizarContadores();
+  } else mostrarFb('No encontrado: ' + icm, 'danger');
+  inp.focus();
+}
+
+function actualizarContadores() {
+  const n = verificados.size;
+  document.getElementById('badge-ver').textContent = n;
+  document.getElementById('cnt-ver').textContent   = n;
+  document.getElementById('cnt-ok').textContent    = n + ' ok';
+  document.getElementById('cnt-pend').textContent  = Math.max(0,TOTAL-n) + ' pendientes';
+  document.getElementById('barra-prog').style.width = (TOTAL>0?Math.round(n/TOTAL*100):0) + '%';
+}
+
+function deshacerUltimo() {
+  if (!ultimoICM) return;
+  const icm = ultimoICM; verificados.delete(icm); ultimoICM = null;
+  const row = document.getElementById('eq-'+icm); if (row) row.style.background='';
+  const ch = document.getElementById('check-'+icm); if (ch) ch.innerHTML='<span class="text-muted">-</span>';
+  document.getElementById('btn-deshacer').disabled = true;
+  actualizarContadores(); inp.focus();
+}
+
+function abrirCierre() {
+  const noEsc = ICM_LIST.filter(i => !verificados.has(i));
+  document.getElementById('res-ver').textContent   = verificados.size;
+  document.getElementById('res-no').textContent    = noEsc.length;
+  document.getElementById('res-total').textContent = TOTAL;
+  const bloque = document.getElementById('bloque-no-esc');
+  if (noEsc.length > 0) {
+    bloque.classList.remove('d-none');
+    document.getElementById('txt-no-esc').textContent = noEsc.length + ' equipos';
+    document.getElementById('tbody-no-esc').innerHTML = noEsc.map(icm => {
+      const e = EQ_MAP[icm]||{};
+      return '<tr><td class="ps-3 font-monospace small text-cm-red">' + icm + '</td>' +
+        '<td class="small">' + (e.marca||'') + ' ' + (e.modelo||'') + '</td>' +
+        '<td><span class="badge bg-light text-dark border">' + (e.seccion||'-') + '</span></td></tr>';
+    }).join('');
+  } else bloque.classList.add('d-none');
+  modalCierre.show();
+}
+
+async function confirmarCierre() {
+  const noEsc = ICM_LIST.filter(i => !verificados.has(i));
+  const r = await _fetch('/revision/cerrar', {method:'POST',headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({verificados:[...verificados],no_escaneados:noEsc,
+      mover_desconocidos:document.getElementById('chk-desc').checked})});
+  const d = await r.json();
+  modalCierre.hide();
+  let msg = 'Revision cerrada. ' + d.verificados + ' verificados.';
+  if (d.movidos_desconocidos > 0) msg += ' ' + d.movidos_desconocidos + ' a ubicacion desconocida.';
+  toast(msg, 'success', 6000);
+  setTimeout(() => window.location.href = '/home', 2000);
+}
+
+function mostrarFb(msg, tipo) {
+  const bg  = {success:'#E8F5E9',danger:'#FFEBEE',warning:'#FFF8E1'}[tipo]||'#E8F5E9';
+  const col = {success:'#1B5E20',danger:'#B71C1C',warning:'#795548'}[tipo]||'#1B5E20';
+  fb.style.cssText = 'background:' + bg + ';color:' + col + ';padding:4px 10px;border-radius:4px';
+  fb.textContent = msg;
+  setTimeout(()=>fb.style.background='transparent',3000);
+}
+inp.focus();
+</script>
+{% endblock %}

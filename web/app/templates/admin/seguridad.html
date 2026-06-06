@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+{% block title %}Seguridad — DEV{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title">
+    <i class="bi bi-shield-lock-fill icon-title"></i>
+    Panel de Seguridad
+    <span class="badge bg-danger ms-2" style="font-size:.65rem;vertical-align:middle;">SOLO DEV</span>
+  </h4>
+</div>
+
+{# ── Tarjetas de resumen ─────────────────────────────────────────────────── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body py-3">
+        <div class="stat-num green">{{ logins_ok }}</div>
+        <div class="stat-lbl"><i class="bi bi-check-circle me-1 text-success"></i>Logins OK (24 h)</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body py-3">
+        <div class="stat-num red">{{ logins_fail }}</div>
+        <div class="stat-lbl"><i class="bi bi-x-circle me-1 text-danger"></i>Fallos login (24 h)</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body py-3">
+        <div class="stat-num {% if usuarios_bloqueados > 0 %}red{% else %}green{% endif %}">{{ usuarios_bloqueados }}</div>
+        <div class="stat-lbl"><i class="bi bi-person-lock me-1"></i>Usuarios bloqueados</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body py-3">
+        <div class="stat-num blue">{{ cambios_admin }}</div>
+        <div class="stat-lbl"><i class="bi bi-person-gear me-1 text-info"></i>Cambios admin (24 h)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  {# ── Estado del sistema ────────────────────────────────────────────────── #}
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-cpu me-2 text-cm-red"></i>Estado del sistema</div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tr>
+            <th class="ps-3 text-muted" style="width:50%">Python</th>
+            <td class="font-monospace">{{ sys_info.python }}</td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Sistema operativo</th>
+            <td class="font-monospace small">{{ sys_info.os }}</td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Debug mode</th>
+            <td>
+              {% if sys_info.debug == '1' %}
+                <span class="badge bg-danger">ON ⚠️</span>
+              {% else %}
+                <span class="badge badge-estado-stock">OFF ✓</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Cookies seguras (HTTPS)</th>
+            <td>
+              {% if sys_info.secure == '1' %}
+                <span class="badge badge-estado-stock">Activo ✓</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">Inactivo</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Usuario BD</th>
+            <td class="font-monospace">{{ sys_info.db_user }}</td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Cifrado contraseñas</th>
+            <td><span class="badge badge-estado-stock">scrypt ✓</span></td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Política contraseña</th>
+            <td class="small">≥10 car. · Mayús · Núm · Especial</td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Límite intentos login</th>
+            <td class="small">5 intentos / 5 min → 15 min bloqueo</td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Sesión deslizante</th>
+            <td class="small">30 min inactividad</td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">Headers de seguridad</th>
+            <td><span class="badge badge-estado-stock">Activos ✓</span></td>
+          </tr>
+          <tr>
+            <th class="ps-3 text-muted">CSRF</th>
+            <td><span class="badge badge-estado-stock">Activo ✓</span></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {# ── Usuarios con intentos fallidos / bloqueados ───────────────────────── #}
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-person-exclamation me-2 text-cm-red"></i>Usuarios — intentos fallidos / bloqueados</span>
+        <a href="{{ url_for('admin.seguridad') }}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-arrow-clockwise"></i> Actualizar
+        </a>
+      </div>
+      <div class="card-body p-0">
+        {% set usuarios_riesgo = [] %}
+        {# Se pasa desde la vista si se implementa; por ahora consulta en contexto #}
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead>
+              <tr>
+                <th class="ps-3">Usuario</th>
+                <th>DNI</th>
+                <th>Rol</th>
+                <th class="text-center">Intentos fallidos</th>
+                <th>Bloqueado hasta</th>
+                <th>Último acceso</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for u in usuarios_lista if usuarios_lista is defined %}
+                {% if u.intentos_fallidos > 0 or u.bloqueado_hasta %}
+                <tr>
+                  <td class="ps-3 fw-semibold">{{ u.nombre }}</td>
+                  <td class="font-monospace small">{{ u.dni }}</td>
+                  <td><span class="badge bg-secondary">{{ u.rol }}</span></td>
+                  <td class="text-center">
+                    {% if u.intentos_fallidos > 0 %}
+                      <span class="badge bg-warning text-dark">{{ u.intentos_fallidos }}</span>
+                    {% else %}—{% endif %}
+                  </td>
+                  <td>
+                    {% if u.bloqueado_hasta %}
+                      <span class="badge bg-danger">{{ u.bloqueado_hasta.strftime('%d/%m %H:%M') }}</span>
+                    {% else %}—{% endif %}
+                  </td>
+                  <td class="small text-muted">
+                    {{ u.ultimo_acceso.strftime('%d/%m/%Y %H:%M') if u.ultimo_acceso else '—' }}
+                  </td>
+                </tr>
+                {% endif %}
+              {% else %}
+                <tr><td colspan="6" class="text-center text-muted py-4">
+                  <i class="bi bi-shield-check text-success me-2"></i>
+                  Sin usuarios bloqueados ni con intentos fallidos
+                </td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>{# /row #}
+
+{# ── Log de auditoría completo ────────────────────────────────────────────── #}
+<div class="card mt-4">
+  <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <span><i class="bi bi-journal-text me-2 text-cm-red"></i>Log de auditoría
+      <span class="badge bg-secondary ms-1">{{ total }} registros</span>
+    </span>
+    <form class="d-flex gap-2 align-items-center" method="GET" action="{{ url_for('admin.seguridad') }}">
+      <select name="tipo" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+        <option value="" {% if not tipo_f %}selected{% endif %}>Todos los tipos</option>
+        <option value="acceso"     {% if tipo_f=='acceso' %}selected{% endif %}>Acceso (login/logout)</option>
+        <option value="admin"      {% if tipo_f=='admin' %}selected{% endif %}>Administración</option>
+        <option value="error"      {% if tipo_f=='error' %}selected{% endif %}>Errores</option>
+      </select>
+      <input type="text" name="q" class="form-control form-control-sm" placeholder="Buscar DNI, IP, descripción…"
+             value="{{ q_f }}" style="min-width:220px">
+      <button class="btn btn-sm btn-cm-red"><i class="bi bi-search"></i></button>
+      {% if tipo_f or q_f %}
+        <a href="{{ url_for('admin.seguridad') }}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-x"></i>
+        </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead class="sticky-top-header">
+        <tr>
+          <th class="ps-3">Fecha / Hora</th>
+          <th>Tipo</th>
+          <th>Categoría</th>
+          <th>DNI / Usuario</th>
+          <th>IP / Equipo</th>
+          <th>Descripción</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in logs %}
+        <tr class="{% if 'FAIL' in (m.descripcion or '') or m.icm == 'ERROR' %}table-danger{% elif 'ADMIN' in m.icm %}table-warning{% endif %}">
+          <td class="ps-3 text-muted small text-nowrap">{{ m.fecha.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+          <td>
+            {% if m.icm == 'ERROR' %}
+              <span class="badge bg-danger"><i class="bi bi-bug me-1"></i>Error</span>
+            {% elif m.icm == 'ADMIN' %}
+              <span class="badge bg-warning text-dark"><i class="bi bi-person-gear me-1"></i>Admin</span>
+            {% else %}
+              <span class="badge bg-secondary"><i class="bi bi-shield me-1"></i>Auth</span>
+            {% endif %}
+          </td>
+          <td>
+            {% set desc = m.descripcion or '' %}
+            {% if 'LOGIN OK' in desc %}
+              <span class="badge badge-estado-stock">Login OK</span>
+            {% elif 'LOGIN FAIL' in desc %}
+              <span class="badge badge-estado-averia">Login FAIL</span>
+            {% elif 'LOGOUT' in desc %}
+              <span class="badge bg-light text-dark border">Logout</span>
+            {% elif 'BLOQUEADO' in desc %}
+              <span class="badge bg-danger">Bloqueado</span>
+            {% elif 'ROL' in desc %}
+              <span class="badge badge-estado-reservado">Cambio rol</span>
+            {% elif 'PASSWORD' in desc %}
+              <span class="badge bg-warning text-dark">Contraseña</span>
+            {% elif 'CREAR' in desc %}
+              <span class="badge badge-estado-stock">Crear usuario</span>
+            {% elif 'ELIMINAR' in desc or 'BAJA' in desc %}
+              <span class="badge badge-estado-averia">Eliminar</span>
+            {% else %}
+              <span class="badge bg-light text-dark border">{{ m.tipo }}</span>
+            {% endif %}
+          </td>
+          <td class="font-monospace small">{{ m.usuario_dni or '—' }}</td>
+          <td class="font-monospace small text-muted">{{ m.pc or '—' }}</td>
+          <td class="small">{{ m.descripcion or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="text-center text-muted py-4">
+            <i class="bi bi-journal-x me-2"></i>Sin registros de auditoría
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# Paginación #}
+  {% if pages > 1 %}
+  <div class="card-footer d-flex justify-content-between align-items-center">
+    <small class="text-muted">Página {{ page }} de {{ pages }} · {{ total }} registros</small>
+    <nav>
+      <ul class="pagination pagination-sm mb-0">
+        {% if page > 1 %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('admin.seguridad', page=page-1, tipo=tipo_f, q=q_f) }}">
+            <i class="bi bi-chevron-left"></i>
+          </a>
+        </li>
+        {% endif %}
+        {% for p in range([1, page-2]|max, [pages+1, page+3]|min) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+          <a class="page-link" href="{{ url_for('admin.seguridad', page=p, tipo=tipo_f, q=q_f) }}">{{ p }}</a>
+        </li>
+        {% endfor %}
+        {% if page < pages %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('admin.seguridad', page=page+1, tipo=tipo_f, q=q_f) }}">
+            <i class="bi bi-chevron-right"></i>
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

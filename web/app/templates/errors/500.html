@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Error interno — SISDAH{% endblock %}
+{% block content %}
+<div class="d-flex flex-column align-items-center justify-content-center" style="min-height:60vh">
+  <div class="text-center">
+    <i class="bi bi-exclamation-triangle-fill text-danger" style="font-size:4rem"></i>
+    <h2 class="mt-3 fw-bold">Error interno del servidor</h2>
+    <p class="text-muted mb-4">Algo salió mal. El error ha sido registrado automáticamente y lo revisará el equipo técnico.</p>
+    <a href="{{ url_for('dashboard.home') }}" class="btn btn-cm-red">
+      <i class="bi bi-house me-2"></i>Volver al inicio
+    </a>
+  </div>
+</div>
+{% endblock %}

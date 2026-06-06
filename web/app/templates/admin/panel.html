@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}Administración{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-shield-lock icon-title"></i>Panel de administración</h4>
+  <small class="text-muted">Gestión de usuarios y permisos</small>
+</div>
+
+<div class="row g-4">
+
+  <!-- Crear usuario rápido -->
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-person-plus me-2 text-cm-red"></i>Crear usuario
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label">DNI *</label>
+          <input type="text" id="new-dni" class="form-control font-monospace"
+                 placeholder="12345678A" oninput="this.value=this.value.toUpperCase()">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Nombre completo *</label>
+          <input type="text" id="new-nombre" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Correo electrónico</label>
+          <input type="email" id="new-email" class="form-control" placeholder="usuario@hgugm.es">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Rol</label>
+          <select id="new-rol" class="form-select"
+                  onchange="document.getElementById('new-pass-group').classList.toggle('d-none', this.value==='tecnico')">
+            <option value="tecnico">Técnico (solo DNI)</option>
+            <option value="gestor_n1">Gestor N1</option>
+            <option value="gestor_n3">Admin N3</option>
+          </select>
+        </div>
+        <div class="mb-3 d-none" id="new-pass-group">
+          <label class="form-label">Contraseña inicial *</label>
+          <input type="password" id="new-password" class="form-control">
+        </div>
+        <button class="btn btn-cm-red w-100" onclick="crearUsuario()">
+          <i class="bi bi-person-plus me-1"></i>Crear usuario
+        </button>
+        <div id="crear-fb" class="mt-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabla de usuarios -->
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-people me-2 text-cm-red"></i>Usuarios del sistema</span>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-cm-red">{{ usuarios|length }}</span>
+          <a href="{{ url_for('admin.usuarios') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-pencil-square me-1"></i>Gestión completa
+          </a>
+        </div>
+      </div>
+      <div class="table-responsive" style="max-height:420px;overflow-y:auto">
+        <table class="table table-sm table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th class="ps-3">DNI</th>
+              <th>Nombre</th>
+              <th>Rol</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in usuarios %}
+            <tr id="row-{{ u.id }}">
+              <td class="ps-3 font-monospace small fw-bold">{{ u.dni }}</td>
+              <td>
+                {{ u.nombre }}
+                {% if u.email %}<br><small class="text-muted">{{ u.email }}</small>{% endif %}
+              </td>
+              <td>
+                {% if u.rol == 'tecnico' %}
+                  <span class="badge bg-light text-dark border">Técnico</span>
+                {% elif u.rol == 'gestor_n1' %}
+                  <span class="badge badge-estado-reservado">Gestor N1</span>
+                {% elif u.rol == 'gestor_n3' %}
+                  <span class="badge bg-cm-red">Admin N3</span>
+                {% elif u.rol == 'developer' %}
+                  <span class="badge" style="background:#6f42c1">Dev</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ u.rol }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if u.activo %}
+                  <span class="badge badge-estado-stock">Activo</span>
+                {% else %}
+                  <span class="badge bg-light text-dark border">Inactivo</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="d-flex gap-1">
+                  <select class="form-select form-select-sm" id="rol-{{ u.id }}"
+                          style="min-width:110px;font-size:.75rem">
+                    <option value="tecnico"   {% if u.rol=='tecnico'   %}selected{% endif %}>Técnico</option>
+                    <option value="gestor_n1" {% if u.rol=='gestor_n1' %}selected{% endif %}>Gestor N1</option>
+                    <option value="gestor_n3" {% if u.rol=='gestor_n3' %}selected{% endif %}>Admin N3</option>
+                  </select>
+                  <button class="btn btn-outline-cm-red btn-sm px-2" title="Guardar rol"
+                          onclick="cambiarRol({{ u.id }})">
+                    <i class="bi bi-check-lg"></i>
+                  </button>
+                  <button class="btn btn-outline-secondary btn-sm px-2" title="Cambiar contraseña"
+                          onclick="cambiarPass({{ u.id }})">
+                    <i class="bi bi-key"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function crearUsuario() {
+  const fb  = document.getElementById('crear-fb');
+  const rol = document.getElementById('new-rol').value;
+  const r   = await _fetch('/admin/usuarios/crear', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      dni:      document.getElementById('new-dni').value.trim().toUpperCase(),
+      nombre:   document.getElementById('new-nombre').value.trim(),
+      email:    document.getElementById('new-email').value.trim(),
+      rol:      rol,
+      password: document.getElementById('new-password').value
+    })
+  });
+  const d = await r.json();
+  if (d.ok) {
+    toast('Usuario creado correctamente', 'success');
+    setTimeout(() => location.reload(), 1000);
+  } else {
+    fb.innerHTML = `<div class="alert alert-danger py-2">${d.error}</div>`;
+  }
+}
+
+async function cambiarRol(uid) {
+  const r = await _fetch(`/admin/usuarios/${uid}/rol`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({rol: document.getElementById(`rol-${uid}`).value})
+  });
+  const d = await r.json();
+  if (d.ok) {
+    const row = document.getElementById(`row-${uid}`);
+    row.style.outline = '2px solid #198754';
+    setTimeout(() => { row.style.outline = ''; location.reload(); }, 700);
+  }
+}
+
+async function cambiarPass(uid) {
+  const pwd = prompt('Nueva contraseña:');
+  if (!pwd) return;
+  const r = await _fetch(`/admin/usuarios/${uid}/password`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({password: pwd})
+  });
+  const d = await r.json();
+  toast(d.ok ? '✓ Contraseña actualizada' : 'Error: ' + d.error, d.ok ? 'success' : 'danger');
+}
+</script>
+{% endblock %}
