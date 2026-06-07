@@ -81,7 +81,7 @@
           <a class="nav-link {% if request.blueprint == 'solicitudes' %}active{% endif %} position-relative"
              href="{{ url_for('solicitudes.lista') }}">
             <i class="bi bi-inbox me-1"></i>Solicitudes
-            {% if n_sol %}<span class="badge bg-cm-red position-absolute" style="top:4px;right:-2px;font-size:.6rem;padding:2px 5px">{{ n_sol }}</span>{% endif %}
+            {% if n_sol %}<span class="badge position-absolute" style="top:4px;right:-2px;font-size:.6rem;padding:2px 5px;background:#0077B6">{{ n_sol }}</span>{% endif %}
           </a>
         </li>
         {% if current_user.es_admin %}

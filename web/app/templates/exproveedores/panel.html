@@ -89,8 +89,8 @@
                 {% endif %}
               </td>
               <td>
-                <button class="btn btn-outline-success btn-sm py-0"
-                        onclick="restaurar('{{ e.marca }}', {{ e.modelo|tojson }})"
+                <button class="btn btn-outline-success btn-sm py-0 btn-restaurar"
+                        data-marca="{{ e.marca }}" data-modelo="{{ e.modelo or '' }}"
                         title="Restaurar al catalogo activo">
                   <i class="bi bi-plus-circle me-1"></i>Restaurar
                 </button>
@@ -201,13 +201,19 @@ async function restaurar(marca, modelo) {
   if (!await sisdahConfirm('Restaurar ' + marca + (modelo ? ' — ' + modelo : '') + ' al catálogo activo.', {title:'Restaurar al catálogo', btnText:'Restaurar', danger:false, btnClass:'btn-success', icon:'bi-arrow-counterclockwise'})) return;
   const r = await _fetch('/exproveedores/eliminar', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({marca, modelo})
+    body: JSON.stringify({marca, modelo: modelo || null})
   });
   const d = await r.json();
   if (d.ok) {
     toast(marca + ' restaurado al catalogo', 'success');
     setTimeout(() => location.reload(), 800);
+  } else {
+    toast(d.error || 'No se pudo restaurar', 'danger');
   }
 }
+
+document.querySelectorAll('.btn-restaurar').forEach(btn => {
+  btn.addEventListener('click', () => restaurar(btn.dataset.marca, btn.dataset.modelo));
+});
 </script>
 {% endblock %}

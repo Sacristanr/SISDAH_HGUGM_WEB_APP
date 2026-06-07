@@ -29,7 +29,7 @@ def buscar():
 
     telefonos = Telefono.query.filter(
         Telefono.extension.ilike(f"%{q}%") |
-        Telefono.ubicacion.ilike(f"%{q}%") |
+        Telefono.ubicacion_libre.ilike(f"%{q}%") |
         Telefono.seccion.ilike(f"%{q}%")
     ).limit(10).all()
 

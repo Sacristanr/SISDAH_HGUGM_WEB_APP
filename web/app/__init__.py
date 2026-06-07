@@ -1,18 +1,21 @@
 from flask import Flask, request, session as fsession
 from flask_login import LoginManager, current_user as cu
 from flask_wtf.csrf import CSRFProtect
+from flask_migrate import Migrate
 from .models import db, Usuario
 from config import Config
 from datetime import timedelta
 
 login_manager = LoginManager()
 csrf = CSRFProtect()
+migrate = Migrate()
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
     db.init_app(app)
+    migrate.init_app(app, db)
     csrf.init_app(app)
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
@@ -92,6 +95,14 @@ def create_app():
     def error_404(e):
         from flask import render_template as rt
         return rt("errors/404.html"), 404
+
+    # ── CSRF expirado: redirigir al login con mensaje claro ──────────────────
+    from flask_wtf.csrf import CSRFError
+    @app.errorhandler(CSRFError)
+    def error_csrf(e):
+        from flask import redirect, url_for, flash
+        flash("Tu sesión ha expirado. Vuelve a iniciar sesión.", "warning")
+        return redirect(url_for("auth.login"))
 
     @app.context_processor
     def inject_solicitudes_badge():
