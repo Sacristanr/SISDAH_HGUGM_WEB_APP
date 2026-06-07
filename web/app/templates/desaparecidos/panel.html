@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Equipos desaparecidos{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h4 class="page-title"><i class="bi bi-question-diamond icon-title"></i>Equipos desaparecidos</h4>
+</div>
+
+<div class="alert border py-2 small mb-3" style="background:#FFF1F0">
+  <i class="bi bi-exclamation-triangle me-1 text-danger"></i>
+  Equipos marcados como <strong>ubicación desconocida</strong> tras una revisión de inventario.
+  No aparecen en el stock general. Haz clic en una fila para ver su ficha completa.
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-question-diamond me-1"></i>Listado</span>
+    <span class="badge bg-cm-red">{{ total }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0">
+      <thead>
+        <tr>
+          <th class="ps-3">ICM</th>
+          <th>Marca/Modelo</th>
+          <th>Sección</th>
+          <th>SN</th>
+          <th>Nº Pedido</th>
+          <th>Fecha de la revisión en que desapareció</th>
+          <th>Notas</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for eq, mov in filas %}
+        <tr id="row-{{ eq.icm }}" class="fila-equipo"
+            onclick="window.location='{{ url_for('inventario.detalle', icm=eq.icm) }}'"
+            style="cursor:pointer">
+          <td class="ps-3 font-monospace fw-bold text-cm-red">{{ eq.icm }}</td>
+          <td>{{ eq.marca or '' }} {{ eq.modelo or '' }}</td>
+          <td><span class="badge bg-light text-dark border">{{ eq.seccion or '-' }}</span></td>
+          <td class="font-monospace small">{{ eq.sn or '-' }}</td>
+          <td class="small">{{ eq.numero_pedido or '-' }}</td>
+          <td class="small text-muted">
+            {% if mov %}
+              <i class="bi bi-calendar-event me-1"></i>{{ mov.fecha.strftime('%d/%m/%Y %H:%M') if mov.fecha else '-' }}
+              <div class="text-muted" style="font-size:.75rem">por {{ mov.usuario_dni }}</div>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td class="small">{{ eq.notas or '-' }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-4">
+            <i class="bi bi-check-circle text-success me-2"></i>No hay equipos en ubicación desconocida
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -144,6 +144,7 @@ def create_app():
     from .ap_wifi        import bp as apwifi_bp
     from .catalogo       import bp as cat_bp
     from .solicitudes    import bp as sol_bp
+    from .desaparecidos  import bp as desap_bp
 
     # Exempt exports from CSRF (GET downloads)
     csrf.exempt(exp_bp)
@@ -151,7 +152,7 @@ def create_app():
     for blueprint in [auth_bp, inv_bp, reg_bp, ret_bp, adm_bp, dash_bp,
                       est_bp, his_bp, pap_bp, tel_bp, lic_bp, pie_bp,
                       res_bp, cfg_bp, rev_bp, srch_bp, fic_bp, exp_bp,
-                      uhist_bp, eprov_bp, etiq_bp, apwifi_bp, cat_bp, sol_bp]:
+                      uhist_bp, eprov_bp, etiq_bp, apwifi_bp, cat_bp, sol_bp, desap_bp]:
         app.register_blueprint(blueprint)
 
     with app.app_context():

@@ -285,16 +285,50 @@ function setModoEntrada(modo) {
   }
 }
 
+// Safari/iOS no implementa BarcodeDetector — cargamos ZXing (UMD desde CDN)
+// como librería de respaldo, capaz de leer QR y Code128 por software.
+let zxingReader   = null;
+let usandoZXing   = false;
+let zxingCargando = null;
+
+function _cargarZXing() {
+  if (window.ZXing) return Promise.resolve();
+  if (zxingCargando) return zxingCargando;
+  zxingCargando = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js';
+    s.onload  = () => resolve();
+    s.onerror = () => reject(new Error('No se pudo cargar el lector de códigos'));
+    document.head.appendChild(s);
+  });
+  return zxingCargando;
+}
+
 async function iniciarCamara() {
   const noSop = document.getElementById('camara-no-soporte');
-  if (!('BarcodeDetector' in window)) { noSop.classList.remove('d-none'); return; }
   noSop.classList.add('d-none');
+  usandoZXing = !('BarcodeDetector' in window);
+
+  if (usandoZXing) {
+    try { await _cargarZXing(); }
+    catch(e) { noSop.classList.remove('d-none'); return; }
+  }
+
   try {
     camaraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
     const video = document.getElementById('camara-video');
     video.srcObject = camaraStream;
     await video.play();
-    detectorCamara = new BarcodeDetector({ formats: ['code_128','code_39','qr_code','ean_13','ean_8'] });
+    if (usandoZXing) {
+      const hints = new Map();
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+        ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.CODE_128,
+        ZXing.BarcodeFormat.CODE_39, ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8
+      ]);
+      zxingReader = new ZXing.BrowserMultiFormatReader(hints);
+    } else {
+      detectorCamara = new BarcodeDetector({ formats: ['code_128','code_39','qr_code','ean_13','ean_8'] });
+    }
     escanearFrame();
   } catch(e) {
     document.getElementById('camara-estado').textContent = '⚠ Sin acceso a la cámara: ' + e.message;
@@ -304,22 +338,37 @@ async function iniciarCamara() {
 function pararCamara() {
   if (scanLoop) { clearTimeout(scanLoop); scanLoop = null; }
   if (camaraStream) { camaraStream.getTracks().forEach(t => t.stop()); camaraStream = null; }
+  if (zxingReader) { try { zxingReader.reset(); } catch(_) {} zxingReader = null; }
+}
+
+function _onCodigoDetectado(valor) {
+  valor = valor.trim().toUpperCase();
+  document.getElementById('camara-icm-val').textContent = valor;
+  document.getElementById('camara-icm-panel').classList.remove('d-none');
+  document.getElementById('btn-camara-add').disabled = false;
+  document.getElementById('camara-estado').textContent = '✓ Código detectado';
+  const flash = document.getElementById('scan-flash');
+  flash.style.opacity = '1';
+  setTimeout(() => flash.style.opacity = '0', 200);
 }
 
 async function escanearFrame() {
   const video = document.getElementById('camara-video');
   if (!camaraStream || video.readyState < 2) { scanLoop = setTimeout(escanearFrame, 200); return; }
+
+  if (usandoZXing) {
+    try {
+      const resultado = await zxingReader.decodeOnceFromVideoElement(video);
+      if (resultado) { _onCodigoDetectado(resultado.getText()); return; }
+    } catch(_) {}
+    scanLoop = setTimeout(escanearFrame, 150);
+    return;
+  }
+
   try {
     const barcodes = await detectorCamara.detect(video);
     if (barcodes.length > 0) {
-      const valor = barcodes[0].rawValue.trim().toUpperCase();
-      document.getElementById('camara-icm-val').textContent = valor;
-      document.getElementById('camara-icm-panel').classList.remove('d-none');
-      document.getElementById('btn-camara-add').disabled = false;
-      document.getElementById('camara-estado').textContent = '✓ Código detectado';
-      const flash = document.getElementById('scan-flash');
-      flash.style.opacity = '1';
-      setTimeout(() => flash.style.opacity = '0', 200);
+      _onCodigoDetectado(barcodes[0].rawValue);
       return; // Pausa hasta que el usuario añada o limpie
     }
   } catch(_) {}

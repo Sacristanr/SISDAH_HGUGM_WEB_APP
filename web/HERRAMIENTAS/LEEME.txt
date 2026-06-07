@@ -1,0 +1,52 @@
+Carpeta HERRAMIENTAS — SISDAH
+==============================
+
+Aquí se guardan scripts y documentos que NO se usan en el día a día,
+pero que conviene conservar por si hacen falta en algún momento puntual
+(nueva instalación, cambio de motor de base de datos, etc.).
+
+Para el uso normal en el hospital, basta con los archivos de la carpeta
+principal "web":
+  - ACTUALIZAR_EN_HOSPITAL.bat   → actualizar la app (con copia de seguridad incluida)
+  - INICIAR_SERVIDOR.bat         → arrancar el servidor
+  - ABRIR_FIREWALL.bat           → solo la primera vez en un equipo nuevo
+
+Contenido de esta carpeta y cuándo usarlo:
+-------------------------------------------
+- DESPLIEGUE_HOSPITAL.bat
+    Versión anterior del script de despliegue. Sustituida por
+    ACTUALIZAR_EN_HOSPITAL.bat (que además hace copia de seguridad
+    automática). Se conserva como referencia.
+
+- INSTALAR.bat
+    Instalación completa desde cero en un equipo que nunca ha tenido
+    SISDAH. Solo necesario para una instalación nueva, no para
+    actualizar una ya existente.
+
+- INSTALAR_SERVICIO.bat
+    Registra SISDAH como servicio de Windows (arranque automático con
+    el equipo). Úsalo solo si se decide que el programa arranque solo
+    al encender el PC del almacén.
+
+- CAMBIAR_A_MYSQL.bat
+    Migra la base de datos de SQLite a MySQL. Solo necesario si en
+    algún momento se cambia el motor de base de datos del que está
+    en uso actualmente.
+
+- sisdah_mysql.sql
+    Volcado / esquema de base de datos para MySQL. Lo usa
+    CAMBIAR_A_MYSQL.bat — no hace falta tocarlo a mano.
+
+- DESPLIEGUE.md
+    Notas de despliegue antiguas, anteriores a la creación de
+    MANUAL_MANTENIMIENTO.md (que las sustituye y amplía). Se conserva
+    como referencia histórica.
+
+- SaludMadrid_duplicado_no_usado.png
+    Copia duplicada del logo que estaba suelta en la carpeta principal.
+    La app usa realmente la versión de app/static/SaludMadrid.png — esta
+    copia no la referencia nada. Se conserva por si acaso, pero se
+    podría borrar sin problema.
+
+Si tienes dudas sobre cuál usar, consulta primero
+MANUAL_MANTENIMIENTO.md (ahora en la carpeta DOCUMENTACION).

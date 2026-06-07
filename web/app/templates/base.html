@@ -223,6 +223,29 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 });
 
+// ── Tablas → tarjetas apiladas en móvil (sin scroll horizontal) ───────────
+// En vez de tener que añadir data-label a mano en cada plantilla, leemos
+// el texto de cada <th> de la cabecera y lo copiamos como data-label en
+// las celdas correspondientes de cada fila. La CSS (.tabla-mobile-cards en
+// sisdah.css) se encarga de apilarlas verticalmente solo en pantallas
+// estrechas — en escritorio la tabla se ve exactamente igual que siempre.
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('main table.table').forEach(function (tabla) {
+    const ths = tabla.querySelectorAll('thead th');
+    if (!ths.length) return;
+    const labels = Array.from(ths).map(th => th.textContent.trim());
+    if (!labels.some(l => l)) return;
+
+    tabla.classList.add('tabla-mobile-cards');
+    tabla.querySelectorAll('tbody tr').forEach(function (tr, fila) {
+      tr.style.setProperty('--i', fila);   // alimenta el stagger en CSS (tope ya aplicado allí)
+      tr.querySelectorAll(':scope > td').forEach(function (td, i) {
+        if (labels[i] && !td.hasAttribute('data-label')) td.setAttribute('data-label', labels[i]);
+      });
+    });
+  });
+});
+
 // CSRF token para fetch
 const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.content || '';
 const _fetch = (url, opts={}) => {

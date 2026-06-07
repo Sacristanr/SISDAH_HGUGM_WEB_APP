@@ -76,6 +76,225 @@ html, body {
 @media (max-width: 767px) {
   .form-control, .form-select, input, select, textarea { font-size: 16px !important; }
   main.main-content { padding: 1rem 1rem; }
+
+  /* ── Insignia de "Solicitudes pendientes" en el menú móvil ─────────────
+     El badge usa position:absolute con coordenadas pensadas para el
+     enlace estrecho del navbar de escritorio. En el menú colapsado de
+     móvil el enlace ocupa todo el ancho, así que el badge termina
+     "flotando" suelto en la esquina, descolgado del texto. Lo devolvemos
+     al flujo normal, justo al lado de la palabra "Solicitudes". */
+  .navbar-collapse .nav-link.position-relative .badge.position-absolute {
+    position: static !important;
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: .4rem;
+    top: auto; right: auto;
+  }
+
+  /* ── Pie del menú móvil: buscador + botón "Salir" ──────────────────────
+     Heredaban el layout de escritorio (anchura fija de 220px, alineados
+     en línea junto al usuario) y en el menú colapsado quedaban apretados,
+     descentrados y de tamaños desiguales. Los apilamos a ancho completo,
+     con separación clara entre ellos y el resto del menú. */
+  .navbar-collapse form[role="search"] {
+    width: 100%;
+    margin: .5rem 0 !important;
+  }
+  .navbar-collapse form[role="search"] .input-group {
+    width: 100% !important;
+  }
+  .navbar-collapse form[role="search"] .search-nav {
+    font-size: 16px; /* evita el zoom automático de iOS al enfocar */
+  }
+  .navbar-collapse > .d-flex:last-child {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: .5rem !important;
+    margin-top: .25rem;
+    padding-top: .5rem;
+    border-top: 1px solid rgba(255,255,255,.15);
+  }
+  .navbar-collapse > .d-flex:last-child .nav-user-info {
+    display: flex !important;
+    justify-content: center;
+  }
+  .navbar-collapse .btn-nav-salir {
+    width: 100%;
+    text-align: center;
+  }
+
+  /* ── Tablas → tarjetas apiladas en móvil (en toda la app) ──────────────
+     Cualquier tabla obliga a deslizar horizontalmente en pantallas
+     estrechas si tiene varias columnas. En su lugar, convertimos cada
+     fila en una "tarjeta": las celdas se apilan en vertical y cada una
+     muestra su etiqueta de columna a la izquierda (vía data-label, que
+     un script en base.html copia automáticamente desde el <thead>).
+     Así se ve todo de un vistazo, sin scroll lateral — en cualquier
+     pantalla de la aplicación, no solo en una tabla concreta. */
+  .tabla-mobile-cards thead { display: none; }
+  .tabla-mobile-cards, .tabla-mobile-cards tbody,
+  .tabla-mobile-cards tr, .tabla-mobile-cards td {
+    display: block;
+    width: 100%;
+  }
+  .tabla-mobile-cards tr {
+    border: 1px solid rgba(0,0,0,.08);
+    border-radius: var(--radius-md, 10px);
+    margin-bottom: .6rem;
+    padding: .35rem .5rem;
+    background: #fff;
+    /* Solo transform/background-color: GPU, sin reflow — y da feedback
+       instantáneo de "pulsación" en filas que navegan al tocarlas
+       (Sonner-style press feedback, igual que un botón). */
+    transition: transform 120ms ease-out, background-color 120ms ease;
+    /* Entrada en cascada suave al pintar la lista por primera vez —
+       nunca desde scale(0): empieza visible (.97) y se asienta.
+       Tope de 6 pasos para que listas largas no tarden en aparecer. */
+    opacity: 0;
+    transform: scale(0.97) translateY(4px);
+    animation: tabla-card-in 220ms cubic-bezier(0.23, 1, 0.32, 1) forwards;
+    animation-delay: calc(min(var(--i, 0), 6) * 40ms);
+  }
+  .tabla-mobile-cards tr.fila-equipo:active,
+  .tabla-mobile-cards tr[onclick]:active {
+    transform: scale(0.98);
+    background: rgba(0,0,0,.035);
+    transition-duration: 80ms; /* la respuesta a la pulsación es instantánea */
+  }
+  @keyframes tabla-card-in {
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tabla-mobile-cards tr {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .tabla-mobile-cards td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .4rem .25rem !important;
+    border: none !important;
+    text-align: right;
+  }
+  .tabla-mobile-cards td:empty,
+  .tabla-mobile-cards td:not([data-label]) { display: none; }
+  .tabla-mobile-cards td::before {
+    content: attr(data-label);
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--bs-secondary-color, #6c757d);
+    text-align: left;
+    flex-shrink: 0;
+  }
+  .tabla-mobile-cards td .d-flex {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  /* Las tablas ya envueltas en .table-responsive no deben seguir
+     forzando scroll lateral una vez convertidas en tarjetas */
+  .table-responsive:has(.tabla-mobile-cards) {
+    overflow-x: visible;
+  }
+
+  /* ── Menú desplegable del navbar (Teleco / Dev) en móvil ───────────────
+     Por defecto Bootstrap posiciona el dropdown en "absolute", lo que en
+     un menú colapsado de móvil queda flotando, desalineado y tapando otros
+     enlaces. Lo integramos como un bloque más dentro del menú: estático,
+     con sangría e indicador visual de submenú — limpio y predecible. */
+  .navbar-collapse .dropdown-menu {
+    position: static !important;
+    float: none;
+    width: 100%;
+    margin: .25rem 0 .5rem;
+    padding: .25rem 0 .25rem .5rem;
+    border: none;
+    border-left: 2px solid rgba(200,16,46,.25);
+    border-radius: 0;
+    box-shadow: none;
+    background: rgba(0,0,0,.02);
+  }
+  .navbar-collapse .dropdown-item {
+    padding: .5rem .75rem;
+    border-radius: var(--radius-sm, 6px);
+  }
+  .navbar-collapse .dropdown-header {
+    padding: .35rem .75rem .15rem;
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .navbar-collapse .dropdown-toggle::after {
+    float: right;
+    margin-top: .55rem;
+  }
+
+  /* ── Versión móvil simplificada del dashboard ──────────────────────────
+     Menos texto, tarjetas más compactas: prioriza el icono y el título,
+     oculta las descripciones largas para que de un vistazo se vea más
+     limpio y quepan más accesos sin sensación de saturación. */
+  .admin-tile-desc { display: none; }
+  .admin-tile-card {
+    padding: .7rem .85rem !important;
+    flex-direction: row !important;
+    align-items: center;
+    text-align: left !important;
+    gap: .7rem;
+    border-radius: var(--radius-md, 12px) !important;
+    border-color: var(--gray-100, #f1f1f3) !important;
+    box-shadow: 0 1px 3px rgba(16,24,40,.05);
+    /* Solo transform/box-shadow — feedback de pulsación instantáneo,
+       como cualquier elemento que navega al tocarlo (estilo Sonner). */
+    transition: transform 120ms ease-out, box-shadow 120ms ease-out, border-color 120ms ease;
+  }
+  .admin-tile-card:active {
+    transform: scale(0.97);
+    box-shadow: 0 1px 2px rgba(16,24,40,.06);
+    transition-duration: 80ms;
+  }
+  .admin-tile-icon {
+    width: 38px; height: 38px;
+    line-height: 38px;
+    font-size: 1.15rem;
+    margin: 0;
+    border-radius: 11px;
+    flex-shrink: 0;
+  }
+  .admin-tile-title {
+    font-size: .76rem;
+    margin-bottom: 0;
+    letter-spacing: .15px;
+  }
+  /* Pequeña flecha al final de la tarjeta — refuerza que es navegable
+     y da equilibrio visual al espacio vacío de la derecha. */
+  .admin-tile-card::after {
+    content: "\F285"; /* bi-chevron-right (Bootstrap Icons) */
+    font-family: "bootstrap-icons", sans-serif;
+    font-size: .8rem;
+    color: var(--gray-300, #d0d5dd);
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  /* Tarjetas de estadísticas: número y etiqueta más compactos */
+  .stat-card { padding: .65rem !important; }
+  .stat-num  { font-size: 1.4rem; }
+  .stat-lbl  { font-size: .65rem; margin-top: 2px; }
+
+  /* ── Cabeceras de sección ("Herramientas de almacén"…) ─────────────────
+     Antes eran solo texto pequeño con una línea decorativa; las hacemos
+     más presentes como separadores reales entre bloques de la cuadrícula,
+     con aire arriba para que no se sientan pegadas a las tarjetas previas. */
+  .section-label {
+    font-size: .68rem;
+    margin-top: 1.5rem;
+    margin-bottom: .75rem;
+  }
 }
 
 /* ── Navbar institucional ──────────────────────────────────── */

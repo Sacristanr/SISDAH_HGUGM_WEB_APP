@@ -25,27 +25,6 @@
     <button class="btn btn-outline-secondary btn-sm" onclick="abrirModalEditar()" title="Editar datos">
       <i class="bi bi-pencil me-1"></i>Editar
     </button>
-    {% if equipo.estado != 'retirado' %}
-    <button class="btn btn-outline-secondary btn-sm" onclick="abrirModalEstado()">
-      <i class="bi bi-arrow-repeat me-1"></i>Estado
-    </button>
-    {% endif %}
-    {% if equipo.estado == 'en stock' %}
-    <button class="btn btn-outline-danger btn-sm" onclick="abrirModalAveria()">
-      <i class="bi bi-exclamation-triangle me-1"></i>Avería
-    </button>
-    <a href="{{ url_for('retiradas.form') }}?icm={{ equipo.icm }}" class="btn btn-cm-red btn-sm">
-      <i class="bi bi-box-arrow-right me-1"></i>Retirar
-    </a>
-    {% elif equipo.estado == 'averia' %}
-    <button class="btn btn-outline-success btn-sm" onclick="restaurar()">
-      <i class="bi bi-check-circle me-1"></i>Reparado
-    </button>
-    {% elif equipo.estado == 'retirado' %}
-    <button class="btn btn-outline-warning btn-sm" onclick="restaurar()">
-      <i class="bi bi-arrow-counterclockwise me-1"></i>Devolver a stock
-    </button>
-    {% endif %}
   </div>
   {% endif %}
 </div>
@@ -199,20 +178,14 @@
             <i class="bi bi-exclamation-triangle-fill"></i>
             Este equipo está en <strong>avería</strong>
           </div>
-          <button class="btn btn-success" onclick="tecnicoReparado()">
-            <i class="bi bi-check-circle me-2"></i>Marcar como reparado
-          </button>
-          <button class="btn btn-outline-secondary" onclick="tecnicoReacondicionado()">
-            <i class="bi bi-tools me-2"></i>En reparación / reacondicionado
+          <button class="btn btn-success" onclick="tecnicoReacondicionado()">
+            <i class="bi bi-check-circle me-2"></i>Marcar como reparado (reacondicionado)
           </button>
         {% elif equipo.estado == 'reacondicionado' %}
           <div class="alert alert-info py-2 mb-1 small d-flex align-items-center gap-2">
             <i class="bi bi-tools"></i>
-            Equipo en proceso de <strong>reparación</strong>
+            Equipo <strong>reacondicionado</strong> — ya reparado y disponible para uso
           </div>
-          <button class="btn btn-success" onclick="tecnicoReparado()">
-            <i class="bi bi-check-circle me-2"></i>Marcar como reparado
-          </button>
           <button class="btn btn-outline-danger" onclick="abrirAveriaModal()">
             <i class="bi bi-exclamation-triangle me-2"></i>Registrar avería
           </button>
@@ -367,7 +340,7 @@
               <i class="bi bi-exclamation-triangle me-2"></i>Avería — equipo con incidencia
             </button>
             <button class="btn text-start" style="border-color:#7B2FBE;color:#7B2FBE;border-width:1px;border-style:solid" onclick="aplicarEstado('reacondicionado')">
-              <i class="bi bi-tools me-2"></i>Reacondicionado — en proceso de reparacion
+              <i class="bi bi-tools me-2"></i>Reacondicionado — ya reparado tras avería
             </button>
             <button class="btn btn-outline-secondary text-start" onclick="aplicarEstado('papelera')">
               <i class="bi bi-trash me-2"></i>Papelera — baja definitiva
@@ -652,12 +625,12 @@ function abrirSolicitudStock() {
 }
 
 async function tecnicoReacondicionado() {
-  if (!await sisdahConfirm('¿Marcar este equipo como en reparación / reacondicionado?', {
-    title:'En reparación', btnText:'Confirmar', danger:false, btnClass:'btn-secondary', icon:'bi-tools'
+  if (!await sisdahConfirm('¿Marcar este equipo como reparado? Pasará al estado "reacondicionado".', {
+    title:'Reacondicionado', btnText:'Confirmar', danger:false, btnClass:'btn-secondary', icon:'bi-tools'
   })) return;
   const r = await _fetch('/retiradas/cambiar_estado', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ icm: ICM, estado: 'reacondicionado', motivo: 'En proceso de reparación' })
+    body: JSON.stringify({ icm: ICM, estado: 'reacondicionado', motivo: 'Reparado tras avería — equipo reacondicionado' })
   });
   const d = await r.json();
   if (d.ok) { toast('Estado actualizado', 'success'); setTimeout(() => location.reload(), 1000); }

@@ -8,19 +8,19 @@
 <!-- Tabs -->
 <ul class="nav nav-tabs mb-3" id="tabs">
   <li class="nav-item">
-    <a class="nav-link active" href="#" onclick="switchTab('piezas');return false">
-      <i class="bi bi-tools me-1"></i>Piezas de repuesto
+    <a class="nav-link active" href="#" onclick="switchTab('complementos');return false">
+      <i class="bi bi-mouse me-1"></i>Complementos
     </a>
   </li>
   <li class="nav-item">
-    <a class="nav-link" href="#" onclick="switchTab('complementos');return false">
-      <i class="bi bi-mouse me-1"></i>Complementos
+    <a class="nav-link" href="#" onclick="switchTab('piezas');return false">
+      <i class="bi bi-tools me-1"></i>Piezas de repuesto
     </a>
   </li>
 </ul>
 
 <!-- ── PIEZAS ──────────────────────────────────────────────── -->
-<div id="tab-piezas">
+<div id="tab-piezas" class="d-none">
   {% if current_user.es_gestor %}
   <div class="d-flex justify-content-end mb-2">
     <button class="btn btn-cm-red btn-sm" onclick="abrirModalPieza()">
@@ -88,7 +88,7 @@
 </div>
 
 <!-- ── COMPLEMENTOS ────────────────────────────────────────── -->
-<div id="tab-complementos" class="d-none">
+<div id="tab-complementos">
   {% if current_user.es_gestor %}
   <div class="d-flex justify-content-end mb-2">
     <button class="btn btn-cm-red btn-sm" onclick="abrirModalComp()">
@@ -292,7 +292,7 @@ function switchTab(t) {
   document.getElementById('tab-piezas').classList.toggle('d-none', t !== 'piezas');
   document.getElementById('tab-complementos').classList.toggle('d-none', t !== 'complementos');
   document.querySelectorAll('#tabs .nav-link').forEach((l, i) => {
-    l.classList.toggle('active', (i === 0 && t === 'piezas') || (i === 1 && t === 'complementos'));
+    l.classList.toggle('active', (i === 0 && t === 'complementos') || (i === 1 && t === 'piezas'));
   });
 }
 

@@ -339,6 +339,7 @@
          role="tabpanel" aria-labelledby="tab-tec">
       <form method="POST" action="{{ url_for('auth.login') }}" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
         <input type="hidden" name="rol_tipo" value="tecnico">
 
         <div class="mb-4">
@@ -365,6 +366,7 @@
          role="tabpanel" aria-labelledby="tab-ges">
       <form method="POST" action="{{ url_for('auth.login') }}" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
         <input type="hidden" name="rol_tipo" value="gestor">
 
         <div class="mb-3">

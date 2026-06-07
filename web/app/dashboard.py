@@ -8,9 +8,22 @@ bp = Blueprint("dashboard", __name__)
 @bp.route("/home")
 @login_required
 def home():
+    # Los equipos en "ubicacion desconocida" no se pueden retirar/usar,
+    # así que no cuentan como "en stock" disponible (pero sí entran en el total,
+    # que es el registro completo de todo lo que hay en el inventario).
+    no_desaparecido = db.or_(Equipo.ubicacion.is_(None),
+                             Equipo.ubicacion != "Ubicacion desconocida")
+
     stats = {
+        # Total de activos: absolutamente todo lo registrado (en stock, averia,
+        # retirado, reacondicionado, desaparecido...) — el registro completo.
         "total":     Equipo.query.count(),
-        "en_stock":  Equipo.query.filter_by(estado="en stock").count(),
+        # En stock: lo que se puede retirar y usar ahora mismo —
+        # "en stock" propiamente dicho + "reacondicionado" (ya reparado),
+        # excluyendo lo que está en ubicación desconocida.
+        "en_stock":  Equipo.query.filter(
+                         Equipo.estado.in_(["en stock", "reacondicionado"])
+                     ).filter(no_desaparecido).count(),
         "retirados": Equipo.query.filter_by(estado="retirado").count(),
         "averia":    Equipo.query.filter_by(estado="averia").count(),
         "reservados":Equipo.query.filter_by(estado="reservado").count(),
