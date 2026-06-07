@@ -6,6 +6,7 @@ from threading import Lock
 from flask import Blueprint, render_template, redirect, url_for, request, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
 from .models import db, Usuario
+from .sanitize import clean_dni, clean_text, clean_log_field
 from config import EMERGENCY_DNI, EMERGENCY_HASH, ROL_N3
 
 bp = Blueprint("auth", __name__)
@@ -50,10 +51,11 @@ def _log_acceso(dni: str, ok: bool, motivo: str = ""):
     """Registra intentos de login en la tabla movimientos como auditoría."""
     try:
         from .models import Movimiento
-        ip = _get_ip()
-        desc = f"LOGIN {'OK' if ok else 'FAIL'} — {motivo}" if motivo else f"LOGIN {'OK' if ok else 'FAIL'}"
+        ip   = _get_ip()
+        dni  = clean_log_field(dni, max_len=20)
+        desc = f"LOGIN {'OK' if ok else 'FAIL'} — {clean_log_field(motivo)}" if motivo else f"LOGIN {'OK' if ok else 'FAIL'}"
         mov = Movimiento(icm="AUTH", tipo="acceso",
-                         usuario_dni=dni, descripcion=desc, pc=ip)
+                         usuario_dni=dni, descripcion=desc, pc=clean_log_field(ip, max_len=64))
         db.session.add(mov)
         db.session.commit()
     except Exception:
@@ -84,7 +86,7 @@ def login():
 
         # ── Login técnico (DNI sin contraseña) ───────────────────
         if rol_tipo == "tecnico":
-            dni = request.form.get("dni_tecnico", "").strip().upper()
+            dni = clean_dni(request.form.get("dni_tecnico", ""))
             if not dni:
                 flash("Introduce tu DNI.", "danger")
                 return render_template("auth/login.html")
@@ -117,8 +119,8 @@ def login():
 
         # ── Login gestor/admin (DNI+contraseña) ──────────────────
         elif rol_tipo == "gestor":
-            identificador = request.form.get("identificador", "").strip()
-            password      = request.form.get("password", "")
+            identificador = clean_text(request.form.get("identificador", ""), max_len=120)
+            password      = request.form.get("password", "")[:200]  # límite defensivo, sin tocar el contenido
 
             if not identificador or not password:
                 flash("Introduce usuario y contraseña.", "danger")

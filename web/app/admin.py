@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for
 from flask_login import login_required, current_user
 from .models import db, Usuario, Equipo, Movimiento
+from .sanitize import clean_dni, clean_text, clean_email, is_valid_email, clean_log_field
 from functools import wraps
 from datetime import datetime
 
@@ -67,26 +68,31 @@ def reasignar_buscar():
 @login_required
 @solo_admin
 def reasignar_aplicar():
-    data     = request.get_json()
-    icm      = data.get("icm", "").strip().upper()
+    data     = request.get_json(silent=True) or {}
+    icm      = clean_text(data.get("icm", ""), max_len=40).upper()
     eq       = Equipo.query.filter_by(icm=icm).first()
     if not eq:
         return jsonify({"ok": False, "error": "ICM no encontrado"})
 
-    cambios = []
-    if data.get("seccion"):
-        cambios.append(f"sección: {eq.seccion} → {data['seccion']}")
-        eq.seccion = data["seccion"]
-    if data.get("estado"):
-        cambios.append(f"estado: {eq.estado} → {data['estado']}")
-        eq.estado = data["estado"]
-    if data.get("ubicacion"):
-        eq.ubicacion = data["ubicacion"]
-        cambios.append(f"ubicación: {data['ubicacion']}")
-    if data.get("notas"):
-        eq.notas = data["notas"]
+    seccion   = clean_text(data.get("seccion", ""), max_len=80)
+    estado    = clean_text(data.get("estado", ""), max_len=20)
+    ubicacion = clean_text(data.get("ubicacion", ""), max_len=150)
+    notas     = clean_text(data.get("notas", ""), max_len=500)
 
-    desc = data.get("notas") or (", ".join(cambios) if cambios else "Reasignación")
+    cambios = []
+    if seccion:
+        cambios.append(f"sección: {eq.seccion} → {seccion}")
+        eq.seccion = seccion
+    if estado:
+        cambios.append(f"estado: {eq.estado} → {estado}")
+        eq.estado = estado
+    if ubicacion:
+        eq.ubicacion = ubicacion
+        cambios.append(f"ubicación: {ubicacion}")
+    if notas:
+        eq.notas = notas
+
+    desc = clean_log_field(notas or (", ".join(cambios) if cambios else "Reasignación"), max_len=500)
     mov  = Movimiento(icm=icm, tipo="reasignacion",
                       usuario_dni=current_user.dni,
                       descripcion=desc, pc=request.remote_addr)
@@ -226,16 +232,18 @@ from .models import validar_password
 @login_required
 @solo_admin
 def crear_usuario():
-    data   = request.get_json()
-    dni    = data.get("dni", "").strip().upper()
-    nombre = data.get("nombre", "").strip()
-    email  = data.get("email", "").strip().lower() or None
-    rol    = data.get("rol", "tecnico")
+    data   = request.get_json(silent=True) or {}
+    dni    = clean_dni(data.get("dni", ""))
+    nombre = clean_text(data.get("nombre", ""), max_len=100)
+    email  = clean_email(data.get("email", "")) or None
+    rol    = clean_text(data.get("rol", "tecnico"), max_len=20)
 
     if not dni or not nombre:
         return jsonify({"ok": False, "error": "DNI y nombre obligatorios"})
     if len(dni) > 20 or len(nombre) > 100:
         return jsonify({"ok": False, "error": "Datos demasiado largos"})
+    if email and not is_valid_email(email):
+        return jsonify({"ok": False, "error": "Email no válido"})
     if rol not in ROLES_VALIDOS:
         return jsonify({"ok": False, "error": "Rol no válido"})
     # Solo developer puede crear otro developer
@@ -271,7 +279,7 @@ def crear_usuario():
 @solo_admin
 def cambiar_rol(uid):
     u   = Usuario.query.get_or_404(uid)
-    rol = request.get_json().get("rol", "tecnico")
+    rol = clean_text((request.get_json(silent=True) or {}).get("rol", "tecnico"), max_len=20)
 
     if rol not in ROLES_VALIDOS:
         return jsonify({"ok": False, "error": "Rol no válido"}), 400
