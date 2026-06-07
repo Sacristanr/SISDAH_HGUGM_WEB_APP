@@ -7,9 +7,12 @@ bp = Blueprint("catalogo", __name__, url_prefix="/catalogo")
 
 
 def solo_gestor(f):
+    """Pese al nombre (mantenido por compatibilidad), el catálogo es una
+    herramienta de administración: solo Admin N3 / developer (es_admin)
+    debe poder verla y gestionarla — no los gestores N1."""
     @wraps(f)
     def decorated(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.es_gestor:
+        if not current_user.is_authenticated or not current_user.es_admin:
             abort(403)
         return f(*args, **kwargs)
     return decorated

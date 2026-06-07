@@ -38,7 +38,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # ── Sesión segura ────────────────────────────────────────────
-    PERMANENT_SESSION_LIFETIME   = timedelta(minutes=30)  # 30 min inactividad
+    PERMANENT_SESSION_LIFETIME   = timedelta(minutes=15)  # 15 min inactividad — equipo fijo de almacén
     SESSION_COOKIE_HTTPONLY      = True    # JS no puede leer la cookie
     SESSION_COOKIE_SAMESITE      = "Lax"  # protección CSRF básica
     SESSION_COOKIE_SECURE        = os.getenv("SESSION_SECURE", "0") == "1"

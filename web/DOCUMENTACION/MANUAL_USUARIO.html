@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SISDAH — Manual de Usuario</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cm-red:#C8102E;
+    --cm-red-dark:#9E0C22;
+    --cm-red-light:#FF5C72;
+    --gray-50:#f8f9fb;
+    --gray-100:#f1f1f3;
+    --gray-200:#e4e6ea;
+    --gray-400:#9aa0aa;
+    --gray-700:#3c4250;
+    --gray-900:#1d2129;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(16,24,40,.04), 0 4px 16px -4px rgba(16,24,40,.07);
+    --shadow-hover:0 2px 6px rgba(16,24,40,.06), 0 12px 28px -6px rgba(200,16,46,.12);
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--gray-900);
+    background:
+      radial-gradient(1200px 500px at 50% -120px, rgba(200,16,46,.06), transparent 60%),
+      var(--gray-50);
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  header.hero{
+    position:relative;
+    background:linear-gradient(135deg,var(--cm-red) 0%,var(--cm-red-dark) 100%);
+    color:#fff;
+    padding:3.4rem 1.5rem 5rem;
+    text-align:center;
+    overflow:hidden;
+  }
+  header.hero::before{
+    content:"";
+    position:absolute;inset:0;
+    background-image:
+      radial-gradient(circle at 18% 30%, rgba(255,255,255,.10) 0, transparent 38%),
+      radial-gradient(circle at 84% 70%, rgba(255,255,255,.08) 0, transparent 42%);
+    pointer-events:none;
+  }
+  header.hero .eyebrow{
+    position:relative;margin:0;opacity:.8;font-size:.78rem;
+    text-transform:uppercase;letter-spacing:2px;font-weight:600;
+  }
+  header.hero h1{
+    position:relative;margin:.55rem 0 .4rem;font-size:2.1rem;font-weight:800;letter-spacing:.2px;
+  }
+  header.hero p.sub{position:relative;margin:0;opacity:.88;font-size:1rem;font-weight:400}
+  .wrap{max-width:880px;margin:0 auto;padding:0 1.25rem 4rem}
+  nav.toc{
+    background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    margin:-2.6rem auto 2.5rem;padding:1.5rem 1.75rem;
+    position:relative;
+  }
+  nav.toc h2{
+    margin:0 0 .9rem;font-size:.78rem;text-transform:uppercase;letter-spacing:1.2px;
+    color:var(--cm-red);font-weight:700;
+    display:flex;align-items:center;gap:.5rem;
+  }
+  nav.toc h2::before{
+    content:"";display:inline-block;width:18px;height:2px;background:var(--cm-red);border-radius:2px;
+  }
+  nav.toc ol{margin:0;padding-left:1.2rem;columns:2;gap:2rem;list-style:none;counter-reset:toc}
+  nav.toc li{margin-bottom:.5rem;font-size:.9rem;counter-increment:toc;position:relative;padding-left:1.6rem}
+  nav.toc li::before{
+    content:counter(toc);
+    position:absolute;left:0;top:.05rem;
+    width:1.15rem;height:1.15rem;border-radius:6px;
+    background:var(--gray-100);color:var(--gray-700);
+    font-size:.68rem;font-weight:700;display:flex;align-items:center;justify-content:center;
+    transition:background-color 160ms var(--ease-out), color 160ms var(--ease-out);
+  }
+  nav.toc li:hover::before{background:var(--cm-red);color:#fff}
+  nav.toc a{color:var(--gray-700);text-decoration:none;transition:color 120ms var(--ease-out)}
+  nav.toc a:hover{color:var(--cm-red)}
+  section{
+    background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:1.85rem 1.85rem;margin-bottom:1.35rem;
+    scroll-margin-top:1.5rem;
+    transition:box-shadow 200ms var(--ease-out), border-color 200ms var(--ease-out), transform 200ms var(--ease-out);
+  }
+  section:hover{box-shadow:var(--shadow-hover);border-color:rgba(200,16,46,.16);transform:translateY(-1px)}
+  section h2{
+    margin:0 0 1.1rem;font-size:1.3rem;font-weight:800;color:var(--gray-900);
+    display:flex;align-items:center;gap:.75rem;letter-spacing:.1px;
+  }
+  section h2 .num{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:34px;height:34px;border-radius:10px;
+    background:linear-gradient(135deg,var(--cm-red),var(--cm-red-dark));
+    color:#fff;font-size:.92rem;font-weight:700;flex-shrink:0;
+    box-shadow:0 4px 12px -2px rgba(200,16,46,.4);
+  }
+  h3{font-size:1.02rem;font-weight:700;color:var(--gray-900);margin:1.5rem 0 .55rem}
+  p{margin:.5rem 0;color:var(--gray-700)}
+  table{
+    width:100%;border-collapse:collapse;margin:.85rem 0 1.1rem;font-size:.92rem;
+    border-radius:10px;overflow:hidden;
+  }
+  th,td{
+    text-align:left;padding:.7rem .85rem;border-bottom:1px solid var(--gray-100);
+    vertical-align:top;
+  }
+  thead th{
+    background:var(--gray-50);font-size:.74rem;text-transform:uppercase;
+    letter-spacing:.6px;color:var(--gray-400);font-weight:700;
+  }
+  tbody tr{transition:background-color 120ms var(--ease-out)}
+  tbody tr:hover{background:#FFF8F8}
+  tbody tr:last-child td{border-bottom:none}
+  ul{padding-left:1.35rem;margin:.5rem 0}
+  li{margin-bottom:.35rem;color:var(--gray-700)}
+  li strong, p strong, td strong{color:var(--gray-900)}
+  code{
+    background:var(--gray-100);padding:.18rem .45rem;border-radius:6px;
+    font-size:.85em;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    color:var(--cm-red-dark);
+  }
+  .callout{
+    border-left:4px solid var(--cm-red);
+    background:linear-gradient(90deg, #FFF5F6, #FFFAFA);
+    border-radius:0 10px 10px 0;
+    padding:.9rem 1.1rem;margin:1.1rem 0;font-size:.92rem;
+    box-shadow:0 1px 2px rgba(200,16,46,.05);
+  }
+  .callout.tip{border-left-color:#2563EB;background:linear-gradient(90deg, #EFF6FF, #FAFCFF);box-shadow:0 1px 2px rgba(37,99,235,.05)}
+  .callout strong{color:var(--cm-red)}
+  .callout.tip strong{color:#2563EB}
+  .badge-rol{
+    display:inline-block;font-size:.7rem;font-weight:700;
+    padding:.2rem .6rem;border-radius:999px;background:var(--gray-100);color:var(--gray-700);
+    letter-spacing:.3px;
+  }
+  hr.div{border:none;height:1px;background:linear-gradient(90deg,transparent,var(--gray-200),transparent);margin:1.5rem 0}
+  footer{
+    text-align:center;color:var(--gray-400);font-size:.82rem;
+    padding:2.5rem 1rem 3rem;
+  }
+  footer .brand{color:var(--cm-red);font-weight:700}
+  a.backtotop{
+    display:inline-flex;align-items:center;gap:.35rem;margin-top:.75rem;font-size:.78rem;
+    color:var(--gray-400);text-decoration:none;font-weight:600;
+    transition:color 120ms var(--ease-out), transform 120ms var(--ease-out);
+  }
+  a.backtotop:hover{color:var(--cm-red);transform:translateX(-2px)}
+  ::selection{background:rgba(200,16,46,.18)}
+  @media (max-width:680px){
+    nav.toc ol{columns:1}
+    section{padding:1.35rem}
+    header.hero{padding:2.4rem 1.1rem 4.4rem}
+    header.hero h1{font-size:1.65rem}
+  }
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto}
+    section, a.backtotop, nav.toc li::before{transition:none}
+    section:hover{transform:none}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <p class="eyebrow">HGUGM · Departamento de Informática</p>
+  <h1>SISDAH — Manual de Usuario</h1>
+  <p class="sub">Sistema de Archivo Hospitalario — Guía de uso de la aplicación</p>
+</header>
+
+<div class="wrap">
+
+  <nav class="toc">
+    <h2>Índice</h2>
+    <ol>
+      <li><a href="#s1">¿Qué es SISDAH?</a></li>
+      <li><a href="#s2">Acceso a la aplicación</a></li>
+      <li><a href="#s3">El panel principal (Dashboard)</a></li>
+      <li><a href="#s4">Inventario de equipos</a></li>
+      <li><a href="#s5">Registrar equipos nuevos</a></li>
+      <li><a href="#s6">Retiradas</a></li>
+      <li><a href="#s7">Códigos QR y etiquetas</a></li>
+      <li><a href="#s8">Otras herramientas del menú</a></li>
+      <li><a href="#s9">Equipos «Desaparecidos»</a></li>
+      <li><a href="#s10">Acceso desde el móvil</a></li>
+      <li><a href="#s11">Consejos de uso</a></li>
+    </ol>
+  </nav>
+
+  <section id="s1">
+    <h2><span class="num">1</span>¿Qué es SISDAH?</h2>
+    <p>
+      SISDAH es la aplicación web del departamento para llevar el control de
+      todo el inventario de equipamiento informático y de telecomunicaciones
+      del hospital: ordenadores, periféricos, teléfonos, puntos de acceso
+      WiFi, licencias, piezas de repuesto, etc. Permite registrar equipos,
+      hacer seguimiento de su ciclo de vida (en stock → retirado → avería →
+      reacondicionado…), generar etiquetas con código de barras y QR, y
+      consultar estadísticas e historiales.
+    </p>
+    <p>Se accede desde cualquier navegador, tanto en el PC del almacén como desde el móvil dentro de la red del hospital.</p>
+  </section>
+
+  <section id="s2">
+    <h2><span class="num">2</span>Acceso a la aplicación</h2>
+
+    <h3>2.1 Iniciar sesión</h3>
+    <p>En la pantalla de login encontrarás dos pestañas:</p>
+    <ul>
+      <li><strong>Técnico</strong> <span class="badge-rol">solo DNI</span> — sin contraseña; acceso limitado a lo esencial (consultar fichas, registrar incidencias, marcar equipos como reparados/reacondicionados…).</li>
+      <li><strong>Gestor / Administrador</strong> <span class="badge-rol">usuario + contraseña</span> — acceso a la gestión completa: registrar equipos, retiradas, edición de datos, administración de usuarios, catálogo, estadísticas, etc.</li>
+    </ul>
+    <div class="callout">
+      <strong>⚠ Atención:</strong> si introduces mal tus credenciales varias veces seguidas, el sistema bloqueará temporalmente los intentos desde tu equipo (protección anti-fuerza-bruta). Espera el tiempo indicado y vuelve a intentarlo.
+    </div>
+
+    <h3>2.2 Cierre de sesión automático</h3>
+    <p>
+      Por seguridad —especialmente porque el equipo del almacén es de uso
+      compartido— <strong>la sesión se cierra automáticamente tras 15 minutos
+      de inactividad</strong>. Si vuelves más tarde y la app te pide iniciar
+      sesión de nuevo, es normal: simplemente vuelve a identificarte.
+    </p>
+    <p>Recuerda también pulsar <strong>Salir</strong> cuando termines, sobre todo si vas a dejar el equipo desatendido.</p>
+  </section>
+
+  <section id="s3">
+    <h2><span class="num">3</span>El panel principal (Dashboard)</h2>
+    <p>Al entrar verás un resumen con tarjetas de estadísticas:</p>
+    <table>
+      <thead><tr><th>Tarjeta</th><th>Qué cuenta</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Total de Activos</strong></td><td>Todo lo registrado en el inventario alguna vez: en stock, averiados, retirados, reacondicionados, desaparecidos… el registro completo</td></tr>
+        <tr><td><strong>En Stock</strong></td><td>Equipos disponibles para retirar y usar ahora mismo (incluye los reacondicionados ya reparados)</td></tr>
+        <tr><td><strong>Retirados</strong></td><td>Equipos que se han sacado del stock para su uso</td></tr>
+        <tr><td><strong>Avería</strong></td><td>Equipos actualmente registrados con una avería</td></tr>
+        <tr><td><strong>Reservados</strong></td><td>Equipos apartados/reservados para un uso concreto</td></tr>
+        <tr><td><strong>Usuarios</strong></td><td>Cuentas de usuario con acceso activo al sistema</td></tr>
+      </tbody>
+    </table>
+    <p>Debajo encontrarás accesos directos a las distintas herramientas, organizados por bloques: <strong>Inventario y gestión</strong> y <strong>Herramientas de almacén</strong>.</p>
+  </section>
+
+  <section id="s4">
+    <h2><span class="num">4</span>Inventario de equipos</h2>
+
+    <h3>4.1 Consultar el inventario</h3>
+    <p>
+      <code>Inventario</code> muestra el listado completo de equipos en stock
+      (los equipos en <em>ubicación desconocida</em> tienen su propio panel y
+      no se mezclan aquí — ver sección 9). Puedes:
+    </p>
+    <ul>
+      <li>Buscar por ICM, S/N, marca, modelo, sección…</li>
+      <li>Pulsar sobre cualquier fila para abrir su <strong>ficha técnica</strong></li>
+    </ul>
+
+    <h3>4.2 Ficha técnica de un equipo</h3>
+    <p>La ficha muestra todos los datos del equipo (ICM, marca, modelo, sección, número de serie, fechas, ubicación, notas…) y, según tu rol:</p>
+    <ul>
+      <li><strong>Editar</strong> los datos del equipo</li>
+      <li>Ver y <strong>descargar/imprimir su etiqueta</strong> (código de barras Code128 + QR)</li>
+      <li>Ejecutar acciones según su estado actual (ver siguiente punto)</li>
+    </ul>
+
+    <h3>4.3 Acciones según el estado del equipo</h3>
+    <p>En la tarjeta <strong>Acciones</strong> de la ficha aparecen solo las opciones que tienen sentido para el estado actual del equipo:</p>
+    <table>
+      <thead><tr><th>Estado</th><th>Acciones disponibles</th></tr></thead>
+      <tbody>
+        <tr><td><strong>En stock</strong></td><td>Registrar retirada · Registrar avería · Cambiar estado</td></tr>
+        <tr><td><strong>Avería</strong></td><td>Marcar como reparado (pasa a <em>reacondicionado</em>) · Cambiar estado</td></tr>
+        <tr><td><strong>Retirado</strong></td><td>Devolver a stock · Registrar avería</td></tr>
+        <tr><td><strong>Reservado</strong></td><td>Registrar retirada · Liberar reserva · Cambiar estado</td></tr>
+      </tbody>
+    </table>
+    <div class="callout">
+      <strong>🔧 Sobre «reacondicionado»:</strong> es un estado <em>sólido y definitivo</em> — un equipo que ya ha sido reparado tras una avería y está listo para volver a usarse. No es un estado «en proceso»; cuenta como disponible en stock y no requiere pasos adicionales para «ponerlo en stock».
+    </div>
+  </section>
+
+  <section id="s5">
+    <h2><span class="num">5</span>Registrar equipos nuevos</h2>
+    <p>Desde <code>Registrar</code> puedes dar de alta nuevos equipos:</p>
+    <ul>
+      <li><strong>Modo manual</strong>: rellenando ICM, marca, modelo, sección, número de serie…</li>
+      <li><strong>Modo cámara</strong> 📷 <em>(solo en móvil/tablet)</em>: apunta la cámara al código de barras o QR de la etiqueta del equipo y se rellenará automáticamente. Funciona tanto en Chrome/Android como en Safari/iPhone.</li>
+    </ul>
+    <p>También puedes generar <strong>TEM</strong> (códigos temporales únicos) para etiquetar equipos que aún no tienen ICM definitivo.</p>
+  </section>
+
+  <section id="s6">
+    <h2><span class="num">6</span>Retiradas</h2>
+    <p>
+      <code>Retiradas</code> te permite registrar la salida de un equipo del
+      stock para su uso (asignación a un usuario, sección, etc.), indicando
+      el motivo, ticket asociado, persona que lo retira, etc. También se
+      gestiona desde aquí el <strong>Control de Retirada</strong>, que
+      permite consultar y filtrar retiradas pasadas.
+    </p>
+  </section>
+
+  <section id="s7">
+    <h2><span class="num">7</span>Códigos QR y etiquetas</h2>
+    <p>Cada equipo tiene una etiqueta con <strong>código de barras Code128</strong> (para escáneres físicos del almacén) y un <strong>código QR</strong>.</p>
+    <p><strong>¿Cómo funciona el QR?</strong> Al escanearlo con el móvil, te lleva directamente a la <strong>ficha técnica del equipo</strong> en la web:</p>
+    <ul>
+      <li>Si <strong>ya tienes sesión iniciada</strong>, se abre la ficha al instante.</li>
+      <li>Si <strong>no la tienes</strong>, la app te lleva primero a la pantalla de login y, en cuanto te identifiques, te devuelve automáticamente a esa misma ficha — sin tener que buscar el equipo de nuevo.</li>
+    </ul>
+    <p>Esto hace que cualquier técnico pueda, con solo apuntar el móvil a la etiqueta de un equipo, consultar toda su información en segundos.</p>
+  </section>
+
+  <section id="s8">
+    <h2><span class="num">8</span>Otras herramientas del menú</h2>
+    <table>
+      <thead><tr><th>Herramienta</th><th>Para qué sirve</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Historial</strong></td><td>Consultar el histórico de movimientos de cualquier ICM</td></tr>
+        <tr><td><strong>Fichas</strong></td><td>Acceso directo a fichas técnicas</td></tr>
+        <tr><td><strong>Teleco → Teléfonos / AP WiFi</strong></td><td>Inventario de telefonía y puntos de acceso WiFi</td></tr>
+        <tr><td><strong>Licencias</strong></td><td>Control de licencias de software</td></tr>
+        <tr><td><strong>Reservas</strong></td><td>Gestión de equipos reservados</td></tr>
+        <tr><td><strong>Piezas y complementos</strong></td><td>Inventario de piezas de repuesto y complementos (periféricos, cables, etc.)</td></tr>
+        <tr><td><strong>Solicitudes</strong></td><td>Peticiones internas pendientes de gestión (con aviso numérico de pendientes)</td></tr>
+        <tr><td><strong>Revisión</strong></td><td>Panel de revisión periódica de equipos</td></tr>
+        <tr><td><strong>Estadísticas</strong></td><td>Gráficas y datos agregados del inventario</td></tr>
+        <tr><td><strong>Papelera</strong></td><td>Elementos eliminados, recuperables si es necesario</td></tr>
+        <tr><td><strong>Admin</strong></td><td>Gestión de usuarios del sistema, catálogo, configuración (solo gestores/administradores)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="s9">
+    <h2><span class="num">9</span>Equipos «Desaparecidos»</h2>
+    <p>El panel <code>Desaparecidos</code> agrupa los equipos marcados con <strong>ubicación desconocida</strong>. Estos equipos:</p>
+    <ul>
+      <li><strong>No</strong> se cuentan dentro del inventario «en stock» ni en los totales de uso habitual (tienen su propio espacio de seguimiento).</li>
+      <li>Sí forman parte del <strong>Total de Activos</strong>, porque siguen estando registrados en el sistema — simplemente no se sabe dónde están físicamente.</li>
+      <li>En el panel puedes ver desde cuándo se perdió la pista de cada equipo y acceder a su ficha para más detalles.</li>
+    </ul>
+  </section>
+
+  <section id="s10">
+    <h2><span class="num">10</span>Acceso desde el móvil</h2>
+    <p>
+      La aplicación es responsive: puedes acceder desde tu teléfono dentro de
+      la red del hospital escribiendo la dirección IP del PC del almacén
+      seguida del puerto (por ejemplo <code>192.168.1.130:5000</code>) en el
+      navegador.
+    </p>
+    <ul>
+      <li>En móvil, el <strong>menú</strong> se simplifica y se organiza en bloques desplegables (Teleco, Dev…) con indentación clara.</li>
+      <li>Las <strong>tablas largas</strong> se muestran como tarjetas apiladas (sin necesidad de deslizar lateralmente) — cada fila se convierte en una ficha con sus datos bien organizados.</li>
+      <li>El <strong>escáner de cámara</strong> funciona tanto en Android/Chrome como en iPhone/Safari.</li>
+    </ul>
+  </section>
+
+  <section id="s11">
+    <h2><span class="num">11</span>Consejos de uso</h2>
+    <ul>
+      <li>Verifica siempre el <strong>ICM</strong> antes de confirmar cualquier acción — es el identificador único de cada equipo.</li>
+      <li>Si vas a dejar el equipo del almacén desatendido, <strong>cierra sesión</strong> manualmente (no dependas solo del cierre automático).</li>
+      <li>Ante cualquier duda sobre el estado de un equipo, consulta su <strong>Historial</strong> — ahí queda constancia de todos los movimientos.</li>
+      <li>Si un equipo «desaparece» del almacén, márcalo con <strong>ubicación desconocida</strong> para que aparezca en el panel de Desaparecidos y no distorsione las cifras de stock disponible.</li>
+    </ul>
+    <div class="callout tip">
+      <strong>💡 Consejo:</strong> ante cualquier problema de acceso desde el móvil, revisa primero que la dirección IP esté bien escrita — es, con diferencia, la causa más frecuente.
+    </div>
+    <a class="backtotop" href="#s1">↑ Volver al índice</a>
+  </section>
+
+</div>
+
+<footer>
+  <hr class="div" style="max-width:880px;margin:0 auto 1.5rem">
+  HGUGM — Departamento de Informática · <span class="brand">SISDAH</span> · Manual de Usuario
+</footer>
+
+</body>
+</html>

@@ -2,7 +2,7 @@
 Generador de etiquetas Code128 + QR para SISDAH
 Produce PNG en memoria lista para imprimir o mostrar en web
 """
-from flask import Blueprint, send_file, request, jsonify, render_template
+from flask import Blueprint, send_file, request, jsonify, render_template, url_for
 from flask_login import login_required, current_user
 from .models import db, Equipo, Movimiento, ConfigApp
 from io import BytesIO
@@ -115,10 +115,19 @@ def generar_etiqueta_png(icm: str, marca: str = "", modelo: str = "",
     qr_x    = W - qr_size - PAD
     qr_y    = (H - qr_size) // 2
 
-    qr_data = json.dumps({
-        "icm": icm, "marca": marca, "modelo": modelo,
-        "sn": sn, "s": "SISDAH"
-    }, ensure_ascii=False, separators=(',', ':'))
+    # El QR enlaza directamente a la ficha del equipo en la web. La ruta
+    # /inventario/<icm> exige sesión iniciada (@login_required): si quien
+    # escanea no está autenticado, Flask-Login le redirige al login y, tras
+    # identificarse, vuelve automáticamente a esta misma ficha (?next=...).
+    try:
+        qr_data = url_for("inventario.detalle", icm=icm, _external=True)
+    except Exception:
+        # Sin contexto de petición (p.ej. generación en lote fuera de request):
+        # fallback al bloque de datos JSON anterior.
+        qr_data = json.dumps({
+            "icm": icm, "marca": marca, "modelo": modelo,
+            "sn": sn, "s": "SISDAH"
+        }, ensure_ascii=False, separators=(',', ':'))
     qr = qrcode.QRCode(version=2, box_size=3, border=1,
                        error_correction=qrcode.constants.ERROR_CORRECT_M)
     qr.add_data(qr_data)

@@ -75,12 +75,12 @@
           <tbody>
             {% for u in usuarios %}
             <tr id="row-{{ u.id }}">
-              <td class="ps-3 font-monospace small fw-bold">{{ u.dni }}</td>
-              <td>
+              <td class="ps-3 font-monospace small fw-bold" data-label="DNI">{{ u.dni }}</td>
+              <td data-label="Nombre">
                 {{ u.nombre }}
                 {% if u.email %}<br><small class="text-muted">{{ u.email }}</small>{% endif %}
               </td>
-              <td>
+              <td data-label="Rol">
                 {% if u.rol == 'tecnico' %}
                   <span class="badge bg-light text-dark border">Técnico</span>
                 {% elif u.rol == 'gestor_n1' %}
@@ -93,14 +93,14 @@
                   <span class="badge bg-secondary">{{ u.rol }}</span>
                 {% endif %}
               </td>
-              <td>
+              <td data-label="Estado">
                 {% if u.activo %}
                   <span class="badge badge-estado-stock">Activo</span>
                 {% else %}
                   <span class="badge bg-light text-dark border">Inactivo</span>
                 {% endif %}
               </td>
-              <td>
+              <td data-label="Acciones">
                 <div class="d-flex gap-1">
                   <select class="form-select form-select-sm" id="rol-{{ u.id }}"
                           style="min-width:110px;font-size:.75rem">
