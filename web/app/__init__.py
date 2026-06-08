@@ -96,6 +96,11 @@ def create_app():
         from flask import render_template as rt
         return rt("errors/404.html"), 404
 
+    @app.errorhandler(403)
+    def error_403(e):
+        from flask import render_template as rt
+        return rt("errors/403.html"), 403
+
     # ── CSRF expirado: redirigir al login con mensaje claro ──────────────────
     from flask_wtf.csrf import CSRFError
     @app.errorhandler(CSRFError)

@@ -296,7 +296,7 @@ function _cargarZXing() {
   if (zxingCargando) return zxingCargando;
   zxingCargando = new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = 'https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js';
+    s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js';
     s.onload  = () => resolve();
     s.onerror = () => reject(new Error('No se pudo cargar el lector de códigos'));
     document.head.appendChild(s);
@@ -323,11 +323,16 @@ async function iniciarCamara() {
       const hints = new Map();
       hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
         ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.CODE_128,
-        ZXing.BarcodeFormat.CODE_39, ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8
+        ZXing.BarcodeFormat.CODE_39,  ZXing.BarcodeFormat.CODE_93,
+        ZXing.BarcodeFormat.EAN_13,   ZXing.BarcodeFormat.EAN_8,
+        ZXing.BarcodeFormat.UPC_A,    ZXing.BarcodeFormat.UPC_E,
+        ZXing.BarcodeFormat.ITF,      ZXing.BarcodeFormat.CODABAR,
+        ZXing.BarcodeFormat.DATA_MATRIX, ZXing.BarcodeFormat.AZTEC,
+        ZXing.BarcodeFormat.PDF_417
       ]);
       zxingReader = new ZXing.BrowserMultiFormatReader(hints);
     } else {
-      detectorCamara = new BarcodeDetector({ formats: ['code_128','code_39','qr_code','ean_13','ean_8'] });
+      detectorCamara = new BarcodeDetector({ formats: await BarcodeDetector.getSupportedFormats().catch(()=>['code_128','code_39','qr_code','ean_13','ean_8','itf','codabar','data_matrix','pdf417','aztec','upc_a','upc_e','code_93']) });
     }
     escanearFrame();
   } catch(e) {

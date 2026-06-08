@@ -111,10 +111,38 @@
       <div class="card-body">
         <div id="hw-equipo-info" class="alert alert-light border mb-3 py-2 small"></div>
         <label class="form-label">Escanea el ICM físico del equipo</label>
-        <input type="text" id="hw-verificacion"
-               class="form-control form-control-lg font-monospace text-center"
-               placeholder="Escanea el ICM físico" autocomplete="off">
+        <div class="input-group">
+          <input type="text" id="hw-verificacion"
+                 class="form-control form-control-lg font-monospace text-center"
+                 placeholder="Escanea el ICM físico" autocomplete="off">
+          <button type="button" class="btn btn-outline-secondary" id="hw-btn-camara"
+                  onclick="hwAbrirCamaraVerificacion()" title="Hacer foto del código para escanearlo">
+            <i class="bi bi-camera"></i>
+          </button>
+        </div>
+        <div class="form-text">¿No tienes lector físico? Pulsa el icono de cámara para escanear con el móvil.</div>
         <div id="hw-ver-feedback" class="mt-2"></div>
+
+        <!-- Panel escáner en vivo -->
+        <div id="hw-camara-panel" class="d-none mt-2">
+          <div style="position:relative;background:#000;border-radius:8px;overflow:hidden">
+            <video id="hw-camara-video" autoplay playsinline muted
+                   style="width:100%;display:block;max-height:300px;object-fit:cover"></video>
+            <canvas id="hw-camara-canvas" style="display:none"></canvas>
+          </div>
+          <div id="hw-camara-estado" class="text-muted small text-center mt-1"></div>
+          <div class="d-flex gap-2 mt-2">
+            <button type="button" class="btn btn-success fw-bold flex-grow-1"
+                    onclick="hwHacerFoto()">
+              <i class="bi bi-camera-fill me-1"></i>Hacer foto
+            </button>
+            <button type="button" class="btn btn-outline-danger" onclick="hwCerrarCamara()">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <input type="file" id="hw-foto-input" accept="image/*" capture="environment"
+                 class="d-none" onchange="hwDecodificarFoto(this)">
+        </div>
       </div>
     </div>
     {% else %}
@@ -490,6 +518,152 @@ document.getElementById('hw-verificacion').addEventListener('input', () => {
   }, 80);
 });
 {% endif %}
+
+// ── Escáner en vivo con cámara (móvil) ──────────────────────────────────
+
+let _hwStream = null, _hwScanTimer = null;
+
+function _hwCargarZXing() {
+  if (window.ZXing) return Promise.resolve();
+  if (window._zxingP) return window._zxingP;
+  window._zxingP = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js';
+    s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  return window._zxingP;
+}
+
+async function hwAbrirCamaraVerificacion() {
+  const panel  = document.getElementById('hw-camara-panel');
+  const estado = document.getElementById('hw-camara-estado');
+  panel.classList.remove('d-none');
+  estado.textContent = 'Cargando escáner…';
+
+  // 1. Cargar ZXing
+  try { await _hwCargarZXing(); }
+  catch(e) { estado.textContent = '⚠ Error cargando librería: ' + (e.message || e); return; }
+
+  // 2. Abrir cámara
+  estado.textContent = 'Solicitando cámara…';
+  try {
+    _hwStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+  } catch(e) {
+    const denegado = e.name === 'NotAllowedError';
+    estado.innerHTML = denegado
+      ? '<strong>⚠ Cámara bloqueada.</strong><br>' +
+        '<b>iPhone:</b> Ajustes → Safari → Cámara → Permitir<br>' +
+        '<b>Android:</b> candado en la barra → Cámara → Permitir'
+      : '⚠ Error de cámara: ' + (e.message || e);
+    return;
+  }
+
+  // 3. Conectar video
+  const video = document.getElementById('hw-camara-video');
+  video.srcObject = _hwStream;
+  video.setAttribute('playsinline', 'true');
+  await video.play().catch(() => {});
+
+  // 4. Esperar a que el video tenga dimensiones reales
+  await new Promise(r => {
+    if (video.videoWidth > 0) { r(); return; }
+    video.addEventListener('loadeddata', r, { once: true });
+    setTimeout(r, 2000); // máximo 2s de espera
+  });
+
+  // 5. Preparar ZXing reader
+  const hints = new Map();
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+    ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+    ZXing.BarcodeFormat.CODE_93,  ZXing.BarcodeFormat.QR_CODE,
+    ZXing.BarcodeFormat.EAN_13,   ZXing.BarcodeFormat.EAN_8,
+    ZXing.BarcodeFormat.UPC_A,    ZXing.BarcodeFormat.UPC_E,
+    ZXing.BarcodeFormat.ITF,      ZXing.BarcodeFormat.DATA_MATRIX,
+    ZXing.BarcodeFormat.PDF_417,  ZXing.BarcodeFormat.AZTEC,
+  ]);
+  hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+  const reader = new ZXing.BrowserMultiFormatReader(hints);
+
+  estado.textContent = 'Apunta el código a la cámara…';
+  _hwEscanear(video, reader);
+}
+
+function _hwEscanear(video, reader) {
+  if (!_hwStream) return;
+
+  const c = document.getElementById('hw-camara-canvas');
+  const w = video.videoWidth;
+  const h = video.videoHeight;
+
+  // Solo escanear si el video ya tiene píxeles reales
+  if (w > 0 && h > 0) {
+    c.width = w; c.height = h;
+    c.getContext('2d').drawImage(video, 0, 0, w, h);
+
+    reader.decodeFromCanvas(c)
+      .then(r => { if (r) _hwCamDetectado(r.getText()); else _hwScanTimer = setTimeout(() => _hwEscanear(video, reader), 250); })
+      .catch(() => { _hwScanTimer = setTimeout(() => _hwEscanear(video, reader), 250); });
+  } else {
+    _hwScanTimer = setTimeout(() => _hwEscanear(video, reader), 250);
+  }
+}
+
+function hwCerrarCamara() {
+  clearTimeout(_hwScanTimer); _hwScanTimer = null;
+  if (_hwStream) { _hwStream.getTracks().forEach(t => t.stop()); _hwStream = null; }
+  const v = document.getElementById('hw-camara-video');
+  v.srcObject = null;
+  document.getElementById('hw-camara-panel').classList.add('d-none');
+}
+
+function hwHacerFoto() {
+  const inp = document.getElementById('hw-foto-input');
+  inp.value = '';
+  inp.click();
+}
+
+function hwDecodificarFoto(input) {
+  if (!input.files || !input.files[0]) return;
+  const estado = document.getElementById('hw-camara-estado');
+  estado.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analizando…';
+
+  const formData = new FormData();
+  formData.append('imagen', input.files[0]);
+  input.value = '';
+
+  const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/retiradas/api/decode-barcode');
+  xhr.setRequestHeader('X-CSRFToken', csrfToken);
+  xhr.onload = function() {
+    try {
+      const data = JSON.parse(xhr.responseText);
+      if (data.ok) {
+        _hwCamDetectado(data.valor);
+      } else {
+        estado.textContent = '✗ No detectado — acerca más el código y repite';
+      }
+    } catch(e) {
+      estado.textContent = '⚠ Error al procesar respuesta';
+    }
+  };
+  xhr.onerror = function() {
+    estado.textContent = '⚠ Error de conexión con el servidor';
+  };
+  xhr.send(formData);
+}
+
+function _hwCamDetectado(valor) {
+  valor = valor.trim().toUpperCase();
+  document.getElementById('hw-camara-estado').textContent = '✓ ' + valor;
+  const inp = document.getElementById('hw-verificacion');
+  inp.value = valor;
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  setTimeout(hwCerrarCamara, 800);
+}
 
 // Modal Hardware
 let _hwRaf = null;

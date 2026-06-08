@@ -58,6 +58,47 @@ def guardar():
     return jsonify({"ok": True, "id": t.id})
 
 
+@bp.route("/retirar/<int:tid>", methods=["POST"])
+@login_required
+def retirar(tid):
+    """Marcar un teléfono como retirado (estado = inactivo).
+
+    A diferencia de /guardar (edición completa, solo gestores), esta acción
+    está disponible también para técnicos: solo cambia el estado a
+    'inactivo' y registra dónde queda el aparato y el ticket asociado —
+    equivalente a una "retirada" de equipo, pero para telefonía. No permite
+    tocar el resto de los datos del teléfono.
+    """
+    import re
+    from datetime import date as _date
+    from .models import Movimiento
+
+    data    = request.get_json(silent=True) or {}
+    destino = (data.get("destino") or "").strip()[:200]
+    ticket  = (data.get("ticket")  or "").strip().upper()[:30]
+
+    if not destino:
+        return jsonify({"ok": False, "error": "Indica la ubicación de destino"}), 400
+    if not re.fullmatch(r"(INC|REQ)\d{8}", ticket):
+        return jsonify({"ok": False, "error": "El ticket debe ser INC o REQ seguido de 8 dígitos (igual que en retiradas de hardware)"}), 400
+
+    t = Telefono.query.get_or_404(tid)
+    t.estado = "inactivo"
+    nota = f"[{_date.today().isoformat()}] Retirado por {current_user.dni} → destino: {destino} · Ticket: {ticket}"
+    t.notas = (t.notas + "\n" + nota) if t.notas else nota
+    db.session.add(t)
+
+    mov = Movimiento(
+        icm=f"TEL-{t.extension or t.id}", tipo="retirada",
+        usuario_dni=current_user.dni,
+        descripcion=f"Retirada de teléfono {t.extension or t.ns or t.id} → destino: {destino} · Ticket: {ticket}",
+        pc=request.remote_addr,
+    )
+    db.session.add(mov)
+    db.session.commit()
+    return jsonify({"ok": True, "id": t.id, "estado": t.estado})
+
+
 @bp.route("/eliminar/<int:tid>", methods=["POST"])
 @login_required
 def eliminar(tid):
