@@ -21,7 +21,7 @@ echo [OK] Python encontrado: %PYTHON%
 :: Instalar dependencias
 echo.
 echo [*] Instalando dependencias Python...
-"%PYTHON%" -m pip install -r "%~dp0requirements.txt" --quiet
+"%PYTHON%" -m pip install -r "%~dp0..\requirements.txt" --quiet
 if errorlevel 1 (
     echo [ERROR] Falló la instalación de dependencias.
     pause & exit /b 1

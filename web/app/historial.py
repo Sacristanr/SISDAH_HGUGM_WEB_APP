@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, request
-from flask_login import login_required
+from flask import Blueprint, render_template, request, abort
+from flask_login import login_required, current_user
 from .models import db, Movimiento, Equipo
 
 bp = Blueprint("historial", __name__, url_prefix="/historial")
@@ -13,6 +13,21 @@ def lista():
     page = request.args.get("page", 1, type=int)
 
     query = Movimiento.query
+
+    # Los técnicos solo deben ver movimientos de equipos (entradas, retiradas,
+    # cambios de estado, restauraciones...). Las entradas de auditoría —
+    # intentos de acceso (login), errores del sistema y acciones de
+    # administración— quedan reservadas a gestores/administradores.
+    if not current_user.es_gestor:
+        query = query.filter(
+            ~Movimiento.tipo.in_(("acceso", "error")),
+            ~Movimiento.icm.in_(("AUTH", "ADMIN", "ERROR")),
+        )
+        # Si alguien intenta forzar el filtro por tipo de auditoría vía URL,
+        # lo ignoramos para que no se cuele nada.
+        if tipo in ("acceso", "error"):
+            tipo = ""
+
     if q:
         query = query.filter(
             Movimiento.icm.ilike(f"%{q}%") |

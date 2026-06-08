@@ -77,7 +77,7 @@
           <th>IP</th>
           <th>Ubicación</th>
           <th>Estado</th>
-          {% if current_user.es_gestor %}<th></th>{% endif %}
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -113,8 +113,8 @@
               <span class="badge bg-light text-dark border">{{ t.estado }}</span>
             {% endif %}
           </td>
-          {% if current_user.es_gestor %}
           <td>
+            {% if current_user.es_gestor %}
             <button class="btn btn-outline-secondary btn-sm py-0"
                     onclick='editarTel({{ t.to_dict()|tojson }})'
                     title="Editar">
@@ -125,12 +125,22 @@
                     title="Eliminar">
               <i class="bi bi-trash"></i>
             </button>
+            {% else %}
+              {% if t.estado != 'inactivo' %}
+              <button class="btn btn-outline-secondary btn-sm py-0"
+                      onclick="retirarTelefono({{ t.id }})"
+                      title="Retirar (marcar como inactivo)">
+                <i class="bi bi-box-arrow-right me-1"></i>Retirar
+              </button>
+              {% else %}
+              <span class="text-muted small">—</span>
+              {% endif %}
+            {% endif %}
           </td>
-          {% endif %}
         </tr>
         {% else %}
         <tr>
-          <td colspan="{{ 8 if current_user.es_gestor else 7 }}"
+          <td colspan="8"
               class="text-center text-muted py-5">
             <i class="bi bi-telephone" style="font-size:2rem;opacity:.2"></i>
             <p class="mb-0 mt-2">Sin teléfonos registrados</p>
@@ -274,6 +284,57 @@
   </div>
 </div>
 {% endif %}
+
+<!-- Modal retirar teléfono (técnicos y gestores) -->
+<div class="modal fade" id="modalRetirarTel" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header" style="background:var(--cm-red-light);border-bottom:1px solid rgba(200,16,46,.15)">
+        <h5 class="modal-title fw-bold text-cm-red">
+          <i class="bi bi-box-arrow-right me-2"></i>Retirar teléfono
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small">Indica dónde queda el teléfono y el ticket asociado a la retirada.</p>
+        <div class="mb-3">
+          <label class="form-label">Ubicación de destino *</label>
+          <input id="retTel-destino" class="form-control" placeholder="Ej: Almacén informática, Planta 2 - Sección X...">
+        </div>
+        <div class="mb-1">
+          <label class="form-label">Tipo de ticket</label>
+          <div class="d-flex gap-2 mb-2">
+            <button type="button" id="retTel-btn-inc" class="btn btn-cm-red flex-grow-1"
+                    onclick="retTelSelTipo('INC')">
+              <i class="bi bi-exclamation-circle me-1"></i>INC — Incidencia
+            </button>
+            <button type="button" id="retTel-btn-req" class="btn btn-outline-secondary flex-grow-1"
+                    onclick="retTelSelTipo('REQ')">
+              <i class="bi bi-clipboard-check me-1"></i>REQ — Petición
+            </button>
+          </div>
+          <div class="input-group">
+            <span class="input-group-text bg-cm-red text-white fw-bold border-cm-red"
+                  id="retTel-ticket-prefijo" style="min-width:52px;justify-content:center">INC</span>
+            <input type="text" id="retTel-ticket-num" class="form-control font-monospace text-center"
+                   placeholder="00000000" maxlength="8" autocomplete="off"
+                   oninput="retTelValidarTicket()" style="letter-spacing:3px;font-size:1.1rem">
+            <span class="input-group-text" id="retTel-ticket-icon">
+              <i class="bi bi-dash text-muted"></i>
+            </span>
+          </div>
+          <div id="retTel-ticket-feedback" class="form-text">&nbsp;</div>
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-cm-red" onclick="confirmarRetirarTel()">
+          <i class="bi bi-check-circle me-1"></i>Retirar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 {% endblock %}
 
@@ -459,5 +520,70 @@ async function borrarLoc(id) {
   }
 }
 {% endif %}
+
+const modalRetirarTel = new bootstrap.Modal(document.getElementById('modalRetirarTel'));
+let _retirarTelId   = null;
+let retTelTipoTicket = 'INC';
+
+function retirarTelefono(id) {
+  _retirarTelId = id;
+  document.getElementById('retTel-destino').value     = '';
+  document.getElementById('retTel-ticket-num').value  = '';
+  retTelSelTipo('INC');
+  modalRetirarTel.show();
+}
+
+function retTelSelTipo(tipo) {
+  retTelTipoTicket = tipo;
+  document.getElementById('retTel-ticket-prefijo').textContent = tipo;
+  document.getElementById('retTel-btn-inc').className = tipo === 'INC'
+    ? 'btn btn-cm-red flex-grow-1' : 'btn btn-outline-secondary flex-grow-1';
+  document.getElementById('retTel-btn-req').className = tipo === 'REQ'
+    ? 'btn btn-cm-red flex-grow-1' : 'btn btn-outline-secondary flex-grow-1';
+  retTelValidarTicket();
+}
+
+function retTelValidarTicket() {
+  const num = document.getElementById('retTel-ticket-num').value.replace(/\D/g,'');
+  document.getElementById('retTel-ticket-num').value = num;
+  const ico = document.getElementById('retTel-ticket-icon').querySelector('i');
+  const fb  = document.getElementById('retTel-ticket-feedback');
+  if (!num) { ico.className = 'bi bi-dash text-muted'; fb.textContent = ''; return; }
+  if (num.length < 8) {
+    ico.className = 'bi bi-x-circle text-danger';
+    fb.className = 'form-text text-danger';
+    fb.textContent = num.length + '/8 dígitos';
+  } else {
+    ico.className = 'bi bi-check-circle-fill text-success';
+    fb.className = 'form-text text-success';
+    fb.textContent = 'Ticket: ' + retTelTipoTicket + num;
+  }
+}
+
+function retTelGetTicket() {
+  const num = document.getElementById('retTel-ticket-num').value;
+  return num.length === 8 ? (retTelTipoTicket + num) : '';
+}
+
+async function confirmarRetirarTel() {
+  const destino = document.getElementById('retTel-destino').value.trim();
+  const ticket  = retTelGetTicket();
+
+  if (!destino) { toast('Indica la ubicación de destino','danger'); return; }
+  if (!ticket)  { toast('Introduce un número de ticket de 8 dígitos','danger'); return; }
+
+  const r = await _fetch(`/telefonos/retirar/${_retirarTelId}`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ destino, ticket })
+  });
+  const d = await r.json();
+  if (d.ok) {
+    modalRetirarTel.hide();
+    toast('Teléfono marcado como retirado','success');
+    location.reload();
+  } else {
+    toast(d.error || 'No se pudo retirar el teléfono','danger');
+  }
+}
 </script>
 {% endblock %}

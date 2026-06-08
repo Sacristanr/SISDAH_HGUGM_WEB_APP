@@ -6,6 +6,11 @@ color 0B
 set PYTHON=%~dp0..\python\python.exe
 set WEB=%~dp0
 
+:: HTTPS con certificado autofirmado: necesario para que el navegador
+:: permita el acceso a la camara (escaner de QR/codigos) desde el movil.
+:: Sin HTTPS, el navegador bloquea getUserMedia silenciosamente.
+set SSL_ADHOC=1
+
 echo.
 echo  =====================================================
 echo  SISDAH -- Script de despliegue en equipo nuevo
@@ -74,7 +79,7 @@ echo  =====================================================
 echo  [OK] Despliegue completado con exito.
 echo.
 echo  Ejecuta INICIAR_SERVIDOR.bat para arrancar.
-echo  URL: http://localhost:5000
+echo  URL: https://localhost:5000  (acepta el aviso de certificado la primera vez)
 echo  =====================================================
 echo.
 pause

@@ -6,6 +6,41 @@ from .models import db, Equipo, Movimiento, Usuario, Telefono, ApWifi, TipoRetir
 bp = Blueprint("retiradas", __name__, url_prefix="/retiradas")
 
 
+# ── Decodificación de códigos de barras en servidor (pyzbar + Pillow) ────────
+@bp.route("/api/decode-barcode", methods=["POST"])
+@login_required
+def decode_barcode():
+    """Recibe una imagen y devuelve el primer código de barras encontrado."""
+    if "imagen" not in request.files:
+        return jsonify({"ok": False, "error": "Sin imagen"}), 400
+    try:
+        from PIL import Image
+        from pyzbar.pyzbar import decode as zbar_decode
+        import io
+
+        img_file = request.files["imagen"]
+        img = Image.open(io.BytesIO(img_file.read()))
+
+        # Convertir a RGB si es necesario (RGBA, P, etc.)
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+
+        # Intentar a resolución original y reducida
+        resultados = zbar_decode(img)
+        if not resultados and max(img.size) > 1200:
+            factor = 1200 / max(img.size)
+            img2 = img.resize((int(img.width * factor), int(img.height * factor)))
+            resultados = zbar_decode(img2)
+
+        if resultados:
+            valor = resultados[0].data.decode("utf-8", errors="replace").strip().upper()
+            return jsonify({"ok": True, "valor": valor})
+        return jsonify({"ok": False, "error": "No detectado"})
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _tipos_activos():

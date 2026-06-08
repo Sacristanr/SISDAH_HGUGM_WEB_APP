@@ -28,32 +28,41 @@ echo   solo si es la primera instalacion en este equipo)
 echo.
 pause
 
-:: ── 1. Copia de seguridad ────────────────────────────────────
+:: ── 1. Copia de seguridad comprimida ─────────────────────────
 echo.
-echo [*] Creando copia de seguridad en:
-echo     %BACKUP%
-mkdir "%BACKUP%" >nul 2>nul
+echo [*] Creando copia de seguridad comprimida...
+mkdir "%~dp0..\BACKUPS" >nul 2>nul
 
-if exist "%WEB%" (
-    xcopy "%WEB%*" "%BACKUP%\web\" /E /I /Q /Y >nul
-    echo [OK] Copia de la carpeta "web" guardada.
+set ZIP_WEB=%~dp0..\BACKUPS\%FECHA%_%HORA%_web.zip
+set ZIP_DB=%~dp0..\BACKUPS\%FECHA%_%HORA%_db.zip
+
+:: Comprimir carpeta web (excluyendo __pycache__ y .pyc)
+echo [*] Comprimiendo carpeta web...
+powershell -NoProfile -Command ^
+  "Get-ChildItem -Path '%WEB%' -Recurse | Where-Object { $_.FullName -notmatch '__pycache__|\.pyc$' } | Compress-Archive -DestinationPath '%ZIP_WEB%' -Update"
+if exist "%ZIP_WEB%" (
+    echo [OK] Web comprimida: %ZIP_WEB%
 ) else (
-    echo [AVISO] No se encontro la carpeta web a copiar.
+    echo [AVISO] No se pudo comprimir la carpeta web.
 )
 
-if exist "E:\SISDAH\data\sisdah.db" (
-    copy "E:\SISDAH\data\sisdah.db" "%BACKUP%\sisdah.db" >nul
-    echo [OK] Copia de la base de datos SQLite guardada.
+:: Comprimir base de datos SQLite si existe
+if exist "%WEB%sisdah.db" (
+    powershell -NoProfile -Command "Compress-Archive -Path '%WEB%sisdah.db' -DestinationPath '%ZIP_DB%' -Force"
+    echo [OK] Base de datos comprimida: %ZIP_DB%
 ) else (
-    echo [INFO] No se encontro sisdah.db en E:\SISDAH\data ^(puede que uses MySQL^).
-    echo        Si usas MySQL, haz tu un volcado con mysqldump antes de continuar.
+    echo [INFO] No hay sisdah.db local ^(probablemente usas MySQL^).
 )
+
+:: Limpiar backups antiguos — conservar solo los 10 mas recientes
+powershell -NoProfile -Command ^
+  "Get-ChildItem '%~dp0..\BACKUPS\' -Filter '*.zip' | Sort-Object LastWriteTime -Descending | Select-Object -Skip 10 | Remove-Item -Force"
 
 echo.
 echo  =====================================================
-echo  Copia de seguridad completada en:
-echo  %BACKUP%
-echo  Si algo falla, puedes restaurar desde esa carpeta.
+echo  Copia de seguridad completada.
+echo  Guardada en: BACKUPS\
+echo  Se conservan los 10 backups mas recientes.
 echo  =====================================================
 echo.
 pause
@@ -121,8 +130,8 @@ echo.
 echo  =====================================================
 echo  [OK] Actualizacion completada con exito.
 echo.
-echo  Copia de seguridad guardada en:
-echo  %BACKUP%
+echo  Copia de seguridad comprimida en:
+echo  BACKUPS\%FECHA%_%HORA%_web.zip
 echo.
 echo  Ahora ejecuta INICIAR_SERVIDOR.bat para arrancar
 echo  y haz una prueba rapida: login tecnico, login gestor,

@@ -131,8 +131,36 @@
           <button class="btn btn-sm btn-outline-light" type="submit" aria-label="Ejecutar búsqueda">
             <i class="bi bi-search" aria-hidden="true"></i>
           </button>
+          <button class="btn btn-sm btn-outline-light" type="button" id="btn-scan-qr"
+                  onclick="abrirScanQR()" aria-label="Escanear código QR o de barras con la cámara"
+                  title="Escanear con la cámara">
+            <i class="bi bi-upc-scan" aria-hidden="true"></i>
+          </button>
         </div>
       </form>
+
+      <!-- ══ Modal: escanear QR/código de barras con la cámara (búsqueda rápida) ══ -->
+      <div class="modal fade" id="modalScanQR" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h6 class="modal-title"><i class="bi bi-upc-scan me-2 text-cm-red"></i>Escanear código</h6>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+              <div class="position-relative d-inline-block w-100" style="max-width:360px">
+                <video id="scanqr-video" class="w-100 rounded border" style="aspect-ratio:1/1;object-fit:cover;background:#000" muted playsinline></video>
+                <div id="scanqr-flash" class="position-absolute top-0 start-0 w-100 h-100 rounded" style="background:#fff;opacity:0;transition:opacity .15s;pointer-events:none"></div>
+                <div class="position-absolute top-50 start-50 translate-middle border border-3 border-cm-red rounded" style="width:65%;height:65%;opacity:.6;pointer-events:none"></div>
+              </div>
+              <p class="text-muted small mt-2 mb-0" id="scanqr-estado">Apunta la cámara al código QR o de barras del equipo…</p>
+              <p class="text-danger small mb-0 d-none" id="scanqr-no-soporte">
+                <i class="bi bi-exclamation-triangle me-1"></i>Tu navegador no permite acceder a la cámara para escanear.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div class="d-flex align-items-center gap-3">
         <span class="nav-user-info d-none d-md-flex align-items-center">
@@ -329,6 +357,131 @@ function toast(msg, tipo='success', duracion=3500) {
     if (_resolve) { _resolve(false); _resolve = null; }
   });
 })();
+
+// ══ Escaneo de QR / código de barras con la cámara → búsqueda rápida ══
+// Mismo enfoque que en registrar/_scripts_lote.html: BarcodeDetector nativo
+// (Chrome/Edge/Android) con respaldo ZXing por software (Safari/iOS).
+let scanqrStream = null, scanqrDetector = null, scanqrZXing = null, scanqrLoop = null, scanqrUsandoZXing = false;
+const modalScanQR = document.getElementById('modalScanQR')
+  ? new bootstrap.Modal(document.getElementById('modalScanQR')) : null;
+
+function _scanqrCargarZXing() {
+  if (window.ZXing) return Promise.resolve();
+  if (window._zxingCargando) return window._zxingCargando;
+  window._zxingCargando = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js';
+    s.onload  = () => resolve();
+    s.onerror = () => reject(new Error('No se pudo cargar el lector de códigos'));
+    document.head.appendChild(s);
+  });
+  return window._zxingCargando;
+}
+
+async function abrirScanQR() {
+  if (!modalScanQR) return;
+  modalScanQR.show();
+  const noSop  = document.getElementById('scanqr-no-soporte');
+  const estado = document.getElementById('scanqr-estado');
+  noSop.classList.add('d-none');
+  estado.textContent = 'Apunta la cámara al código QR o de barras del equipo…';
+  scanqrUsandoZXing = !('BarcodeDetector' in window);
+
+  if (scanqrUsandoZXing) {
+    try { await _scanqrCargarZXing(); }
+    catch(e) { noSop.classList.remove('d-none'); return; }
+  }
+  try {
+    scanqrStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'environment',
+        width:  { ideal: 1920 },
+        height: { ideal: 1080 },
+        advanced: [{ focusMode: 'continuous' }]
+      }
+    });
+    const track = scanqrStream.getVideoTracks()[0];
+    if (track && track.applyConstraints) {
+      track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+    }
+    const video = document.getElementById('scanqr-video');
+    video.srcObject = scanqrStream;
+    await video.play();
+    if (scanqrUsandoZXing) {
+      const hints = new Map();
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+        ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.CODE_128,
+        ZXing.BarcodeFormat.CODE_39,  ZXing.BarcodeFormat.CODE_93,
+        ZXing.BarcodeFormat.EAN_13,   ZXing.BarcodeFormat.EAN_8,
+        ZXing.BarcodeFormat.UPC_A,    ZXing.BarcodeFormat.UPC_E,
+        ZXing.BarcodeFormat.ITF,      ZXing.BarcodeFormat.CODABAR,
+        ZXing.BarcodeFormat.DATA_MATRIX, ZXing.BarcodeFormat.AZTEC,
+        ZXing.BarcodeFormat.PDF_417
+      ]);
+      scanqrZXing = new ZXing.BrowserMultiFormatReader(hints);
+    } else {
+      scanqrDetector = new BarcodeDetector({ formats: await BarcodeDetector.getSupportedFormats().catch(()=>['code_128','code_39','qr_code','ean_13','ean_8','itf','codabar','data_matrix','pdf417','aztec','upc_a','upc_e','code_93']) });
+    }
+    _scanqrFrame();
+  } catch(e) {
+    estado.textContent = '⚠ Sin acceso a la cámara: ' + e.message;
+  }
+}
+
+function _scanqrParar() {
+  if (scanqrLoop) { clearTimeout(scanqrLoop); scanqrLoop = null; }
+  if (scanqrStream) { scanqrStream.getTracks().forEach(t => t.stop()); scanqrStream = null; }
+  if (scanqrZXing) { try { scanqrZXing.reset(); } catch(_) {} scanqrZXing = null; }
+  scanqrDetector = null;
+}
+
+function _scanqrDetectado(valor) {
+  valor = valor.trim().toUpperCase();
+  _scanqrParar();
+  const flash = document.getElementById('scanqr-flash');
+  flash.style.opacity = '1';
+  document.getElementById('scanqr-estado').textContent = '✓ Código detectado: ' + valor;
+  setTimeout(() => {
+    if (modalScanQR) modalScanQR.hide();
+    window.location.href = "{{ url_for('search.buscar') }}?q=" + encodeURIComponent(valor);
+  }, 350);
+}
+
+let _scanqrCanvas = null;
+function _scanqrGetCanvas(video) {
+  if (!_scanqrCanvas) {
+    _scanqrCanvas = document.createElement('canvas');
+    _scanqrCanvas.style.display = 'none';
+    document.body.appendChild(_scanqrCanvas);
+  }
+  _scanqrCanvas.width  = video.videoWidth  || 640;
+  _scanqrCanvas.height = video.videoHeight || 480;
+  _scanqrCanvas.getContext('2d').drawImage(video, 0, 0, _scanqrCanvas.width, _scanqrCanvas.height);
+  return _scanqrCanvas;
+}
+
+async function _scanqrFrame() {
+  const video = document.getElementById('scanqr-video');
+  if (!scanqrStream || video.readyState < 2) { scanqrLoop = setTimeout(_scanqrFrame, 200); return; }
+
+  if (scanqrUsandoZXing) {
+    try {
+      const canvas = _scanqrGetCanvas(video);
+      const resultado = await scanqrZXing.decodeFromCanvas(canvas);
+      if (resultado) { _scanqrDetectado(resultado.getText()); return; }
+    } catch(_) {}
+    scanqrLoop = setTimeout(_scanqrFrame, 150);
+  } else {
+    try {
+      const codigos = await scanqrDetector.detect(video);
+      if (codigos.length) { _scanqrDetectado(codigos[0].rawValue); return; }
+    } catch(_) {}
+    scanqrLoop = setTimeout(_scanqrFrame, 200);
+  }
+}
+
+document.getElementById('modalScanQR') && document.getElementById('modalScanQR')
+  .addEventListener('hidden.bs.modal', _scanqrParar);
 </script>
 {% block scripts %}{% endblock %}
 </body>
