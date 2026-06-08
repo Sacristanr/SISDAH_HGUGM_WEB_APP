@@ -14,6 +14,11 @@ def lista():
     page   = request.args.get("page", 1, type=int)
 
     query = Equipo.query
+    # Los equipos en "ubicacion desconocida" tienen su propio dashboard
+    # (/desaparecidos/) y no deben mezclarse con el stock general.
+    query = query.filter(
+        db.or_(Equipo.ubicacion.is_(None), Equipo.ubicacion != "Ubicacion desconocida")
+    )
     if q:
         query = query.filter(
             Equipo.icm.ilike(f"%{q}%") |

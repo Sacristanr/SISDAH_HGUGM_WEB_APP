@@ -22,6 +22,16 @@ _BLOCK_SECS   = 900      # bloqueo 15 minutos tras superar límite
 def _get_ip() -> str:
     return request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
 
+
+def _safe_next(url: str) -> str:
+    """Solo permite redirecciones a rutas internas (evita open-redirect).
+    Acepta '/inventario/XXXX' pero rechaza 'https://evil.com' o '//evil.com'."""
+    if not url:
+        return ""
+    if url.startswith("/") and not url.startswith("//") and "\\" not in url:
+        return url
+    return ""
+
 def _check_rate_limit(ip: str) -> tuple[bool, int]:
     """(permitido, segundos_restantes). Limpia entradas expiradas."""
     now = time.time()
@@ -71,16 +81,31 @@ def index():
 
 @bp.route("/login", methods=["GET", "POST"])
 def login():
-    if current_user.is_authenticated:
-        return redirect(url_for("dashboard.home"))
+    next_url = _safe_next(request.values.get("next", ""))
+
+    # Solo desviamos a quien YA está autenticado si simplemente visita /login
+    # (GET). Si llega un POST con un formulario de login, lo procesamos
+    # siempre como un intento de inicio de sesión real — de lo contrario,
+    # una sesión "zombi" (cookie aún viva aunque la UI muestre la pantalla
+    # de login por caducidad aparente) dejaría pasar CUALQUIER DNI sin
+    # validarlo, simplemente reenviando a quien ya estaba dentro.
+    if request.method == "GET" and current_user.is_authenticated:
+        return redirect(next_url or url_for("dashboard.home"))
 
     if request.method == "POST":
+        # Si había una sesión previa todavía activa, la cerramos antes de
+        # validar las nuevas credenciales — así el resultado del POST
+        # depende exclusivamente de lo que la persona acaba de introducir.
+        if current_user.is_authenticated:
+            logout_user()
+            session.clear()
+
         ip = _get_ip()
         permitido, wait = _check_rate_limit(ip)
         if not permitido:
             mins = wait // 60 + 1
             flash(f"Demasiados intentos fallidos. Espera {mins} minuto(s) antes de volver a intentarlo.", "danger")
-            return render_template("auth/login.html")
+            return render_template("auth/login.html", next_url=next_url)
 
         rol_tipo = request.form.get("rol_tipo")
 
@@ -89,7 +114,7 @@ def login():
             dni = clean_dni(request.form.get("dni_tecnico", ""))
             if not dni:
                 flash("Introduce tu DNI.", "danger")
-                return render_template("auth/login.html")
+                return render_template("auth/login.html", next_url=next_url)
 
             usuario = Usuario.query.filter(
                 (Usuario.dni == dni) &
@@ -101,7 +126,7 @@ def login():
                 _record_attempt(ip)
                 _log_acceso(dni, False, "DNI técnico no encontrado")
                 flash("DNI no encontrado o sin acceso de técnico. Contacta con administración.", "danger")
-                return render_template("auth/login.html")
+                return render_template("auth/login.html", next_url=next_url)
 
             # Renovar sesión para evitar session fixation
             session.clear()
@@ -115,7 +140,7 @@ def login():
 
             _clear_attempts(ip)
             _log_acceso(dni, True, "técnico")
-            return redirect(url_for("dashboard.home"))
+            return redirect(next_url or url_for("dashboard.home"))
 
         # ── Login gestor/admin (DNI+contraseña) ──────────────────
         elif rol_tipo == "gestor":
@@ -124,7 +149,7 @@ def login():
 
             if not identificador or not password:
                 flash("Introduce usuario y contraseña.", "danger")
-                return render_template("auth/login.html")
+                return render_template("auth/login.html", next_url=next_url)
 
             # Credencial de emergencia
             if identificador.upper() == EMERGENCY_DNI and _hash_sha256(password) == EMERGENCY_HASH:
@@ -144,7 +169,7 @@ def login():
                 _clear_attempts(ip)
                 _log_acceso(EMERGENCY_DNI, True, "acceso emergencia")
                 flash("⚠️ Acceso de emergencia activo. Cambia las credenciales cuanto antes.", "warning")
-                return redirect(url_for("dashboard.home"))
+                return redirect(next_url or url_for("dashboard.home"))
 
             # Usuario normal
             usuario = Usuario.query.filter(
@@ -158,7 +183,7 @@ def login():
                 wait_min = int((usuario.bloqueado_hasta - datetime.utcnow()).seconds / 60) + 1
                 _record_attempt(ip)
                 flash(f"Cuenta bloqueada por intentos fallidos. Espera {wait_min} minuto(s).", "danger")
-                return render_template("auth/login.html")
+                return render_template("auth/login.html", next_url=next_url)
 
             if not usuario or not usuario.check_password(password):
                 _record_attempt(ip)
@@ -173,11 +198,11 @@ def login():
                 else:
                     flash("Credenciales incorrectas.", "danger")
                 _log_acceso(identificador, False, "contraseña incorrecta")
-                return render_template("auth/login.html")
+                return render_template("auth/login.html", next_url=next_url)
 
             if usuario.rol == "tecnico":
                 flash("Tu cuenta no tiene acceso de gestor.", "danger")
-                return render_template("auth/login.html")
+                return render_template("auth/login.html", next_url=next_url)
 
             session.clear()
             session.permanent = True
@@ -189,9 +214,9 @@ def login():
 
             _clear_attempts(ip)
             _log_acceso(usuario.dni, True, usuario.rol)
-            return redirect(url_for("dashboard.home"))
+            return redirect(next_url or url_for("dashboard.home"))
 
-    return render_template("auth/login.html")
+    return render_template("auth/login.html", next_url=next_url)
 
 
 @bp.route("/logout")
