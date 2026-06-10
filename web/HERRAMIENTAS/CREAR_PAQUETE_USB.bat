@@ -52,8 +52,19 @@ if errorlevel 1 (
 )
 echo [OK] Dependencias descargadas en whl\
 
-:: -- 3. Copiar el instalador al paquete ------------------------
+:: -- 3. Copiar Python portable (para instalaciones desde cero) -
+if exist "%~dp0..\..\python\python.exe" (
+    echo [*] Copiando Python portable al paquete...
+    robocopy "%~dp0..\..\python" "%DEST%\python" /E /NFL /NDL /NJH /NJS >nul
+    echo [OK] Python incluido ^(permite instalar en PCs sin SISDAH^).
+) else (
+    echo [AVISO] No se encontro la carpeta python\ -- el paquete solo
+    echo         servira para ACTUALIZAR, no para instalar desde cero.
+)
+
+:: -- 4. Copiar instalador y desinstalador al paquete -----------
 copy "%~dp0plantilla_ACTUALIZAR.bat" "%DEST%\ACTUALIZAR.bat" >nul
+copy "%~dp0DESINSTALAR_SISDAH.bat" "%DEST%\DESINSTALAR_SISDAH.bat" >nul 2>nul
 echo [OK] Instalador ACTUALIZAR.bat incluido.
 
 :: -- 4. Resumen ------------------------------------------------
