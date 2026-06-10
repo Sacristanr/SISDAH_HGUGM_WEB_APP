@@ -121,12 +121,23 @@ if errorlevel 1 (
 echo.
 echo  =====================================================
 echo  [OK] ACTUALIZACION COMPLETADA
+echo  =====================================================
 echo.
-echo  Arranca el servidor con INICIAR_SERVIDOR.bat y prueba:
+choice /C SN /M "Quieres arrancar el servidor ahora"
+if errorlevel 2 goto :fin
+
+echo.
+echo [*] Arrancando servidor SISDAH...
+start "SISDAH Servidor" /D "%DESTINO%\web" "%DESTINO%\web\INICIAR_SERVIDOR.bat"
+echo [OK] Servidor arrancando en una ventana nueva.
+echo.
+echo  Prueba rapida recomendada:
 echo   - Login tecnico y gestor
 echo   - Abrir una ficha
+echo   - Probar la nueva pantalla de Sustitucion
 echo   - Imprimir una etiqueta de prueba
 echo   - Escanear con el movil
-echo  =====================================================
+
+:fin
 echo.
 pause
