@@ -8,7 +8,10 @@ load_dotenv(os.path.join(_base, ".env"))
 
 def _build_uri():
     if os.getenv("USE_SQLITE", "1") == "1":
-        db_path = os.path.join(r"E:\SISDAH\data", "sisdah.db")
+        # Ruta configurable; si no, E:\SISDAH\data si existe, y si no, junto a la app
+        default_dir = r"E:\SISDAH\data" if os.path.isdir(r"E:\SISDAH\data") else _base
+        db_dir  = os.getenv("SQLITE_DIR", default_dir)
+        db_path = os.path.join(db_dir, "sisdah.db")
         return f"sqlite:///{db_path}"
     user = os.getenv("DB_USER", "sisdah_app")   # nunca root en producción
     pwd  = os.getenv("DB_PASSWORD", "")

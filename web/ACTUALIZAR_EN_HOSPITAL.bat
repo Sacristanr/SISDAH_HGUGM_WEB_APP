@@ -3,7 +3,10 @@ chcp 65001 >nul
 title SISDAH -- Actualizacion en equipo del hospital
 color 0B
 
+:: Buscar Python portable en las rutas conocidas
 set PYTHON=%~dp0..\python\python.exe
+if not exist "%PYTHON%" set PYTHON=%USERPROFILE%\Desktop\SISDAH\python\python.exe
+if not exist "%PYTHON%" set PYTHON=C:\Users\54421076V\Desktop\SISDAH\python\python.exe
 set WEB=%~dp0
 set FECHA=%date:~-4%-%date:~3,2%-%date:~0,2%
 set HORA=%time:~0,2%%time:~3,2%
@@ -28,7 +31,7 @@ echo   solo si es la primera instalacion en este equipo)
 echo.
 pause
 
-:: ── 1. Copia de seguridad comprimida ─────────────────────────
+:: -- 1. Copia de seguridad comprimida --------------------------------------------------
 echo.
 echo [*] Creando copia de seguridad comprimida...
 mkdir "%~dp0..\BACKUPS" >nul 2>nul
@@ -54,7 +57,7 @@ if exist "%WEB%sisdah.db" (
     echo [INFO] No hay sisdah.db local ^(probablemente usas MySQL^).
 )
 
-:: Limpiar backups antiguos — conservar solo los 10 mas recientes
+:: Limpiar backups antiguos -- conservar solo los 10 mas recientes
 powershell -NoProfile -Command ^
   "Get-ChildItem '%~dp0..\BACKUPS\' -Filter '*.zip' | Sort-Object LastWriteTime -Descending | Select-Object -Skip 10 | Remove-Item -Force"
 
@@ -67,26 +70,40 @@ echo  =====================================================
 echo.
 pause
 
-:: ── 2. Verificar Python portable ─────────────────────────────
+:: -- 2. Verificar Python portable ------------------------------
 if not exist "%PYTHON%" (
-    echo [ERROR] No se encontro Python portable en ..\python\python.exe
+    echo [ERROR] No se encontro Python portable. Rutas comprobadas:
+    echo           ..\python\python.exe
+    echo           %%USERPROFILE%%\Desktop\SISDAH\python\python.exe
     echo         Copia la carpeta "python" junto a la carpeta "web"
     pause & exit /b 1
 )
-echo [OK] Python portable encontrado.
+echo [OK] Python portable encontrado: %PYTHON%
 
-:: ── 3. Instalar/actualizar dependencias ──────────────────────
+:: -- 3. Instalar/actualizar dependencias -----------------------
+:: Si existe C:\whl (paquetes descargados a mano, red sin PyPI)
+:: se instala desde ahi sin tocar internet.
 echo.
 echo [*] Instalando dependencias Python...
-"%PYTHON%" -m pip install -r "%WEB%requirements.txt" --quiet --no-warn-script-location
+set PIPOPTS=
+if exist "C:\whl\" set PIPOPTS=--no-index --find-links C:\whl
+"%PYTHON%" -m pip install -r "%WEB%requirements.txt" %PIPOPTS% --quiet --no-warn-script-location
+if errorlevel 1 (
+    if exist "C:\whl\" (
+        echo [AVISO] Faltan paquetes en C:\whl -- reintentando contra PyPI...
+        "%PYTHON%" -m pip install -r "%WEB%requirements.txt" --quiet --no-warn-script-location
+    )
+)
 if errorlevel 1 (
     echo [ERROR] Fallo la instalacion de dependencias.
+    echo         Si la red bloquea PyPI: descarga los .whl que falten
+    echo         desde el navegador y dejalos en C:\whl\
     echo         Puedes restaurar la copia de seguridad de %BACKUP% si hace falta.
     pause & exit /b 1
 )
 echo [OK] Dependencias instaladas.
 
-:: ── 4. Verificar .env ─────────────────────────────────────────
+:: -- 4. Verificar .env ----------------------------------------------------------------------------------
 if not exist "%WEB%.env" (
     echo.
     echo [!] No se encontro el archivo .env
@@ -104,11 +121,11 @@ if not exist "%WEB%.env" (
 )
 echo [OK] Archivo .env encontrado.
 
-:: ── 5. Migracion de base de datos ─────────────────────────────
+:: -- 5. Migracion de base de datos -----------------------------
 echo.
 echo [*] Aplicando migracion de base de datos...
 cd /d "%WEB%"
-"%PYTHON%" migrar_seguridad.py
+"%PYTHON%" -m flask --app run.py db upgrade
 if errorlevel 1 (
     echo [AVISO] La migracion tuvo algun problema. Revisa la BD manualmente.
     echo         Tienes la copia de seguridad en %BACKUP% por si hay que restaurar.
@@ -116,7 +133,7 @@ if errorlevel 1 (
     echo [OK] Base de datos actualizada.
 )
 
-:: ── 6. Verificar que la app arranca ──────────────────────────
+:: -- 6. Verificar que la app arranca -----------------------------------------------------
 echo.
 echo [*] Verificando que la aplicacion arranca correctamente...
 "%PYTHON%" -c "import sys; sys.path.insert(0,'.'); from app import create_app; create_app(); print('[OK] App verificada correctamente.')"

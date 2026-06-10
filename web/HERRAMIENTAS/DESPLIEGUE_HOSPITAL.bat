@@ -54,7 +54,7 @@ if not exist "%WEB%.env" (
 )
 echo [OK] Archivo .env encontrado.
 
-:: 4. Ejecutar migracion de seguridad (añade columnas si no existen)
+:: 4. Ejecutar migracion de seguridad (anade columnas si no existen)
 echo.
 echo [*] Aplicando migracion de base de datos...
 cd /d "%WEB%"

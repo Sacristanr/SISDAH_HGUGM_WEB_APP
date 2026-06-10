@@ -8,7 +8,7 @@ app = create_app()
 
 if __name__ == "__main__":
     port  = int(os.getenv("PORT", "5000"))
-    debug = os.getenv("FLASK_DEBUG", "1") == "1"   # auto-reload activo por defecto
+    debug = os.getenv("FLASK_DEBUG", "0") == "1"   # produccion por defecto; FLASK_DEBUG=1 para desarrollo
 
     # ── HTTPS con certificado autofirmado ────────────────────────────────
     # Los navegadores solo permiten getUserMedia (cámara/micrófono) en

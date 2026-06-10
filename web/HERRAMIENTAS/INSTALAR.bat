@@ -1,29 +1,42 @@
 @echo off
 chcp 65001 >nul
-title SISDAH — Instalación inicial
+title SISDAH -- Instalacion inicial
 color 0B
 echo.
-echo  ╔══════════════════════════════════════════════════╗
-echo  ║        SISDAH Web — Instalación inicial          ║
-echo  ║        HGUGM Departamento de Informática         ║
-echo  ╚══════════════════════════════════════════════════╝
+echo  +==================================================+
+echo  |        SISDAH Web -- Instalacion inicial          |
+echo  |        HGUGM Departamento de Informatica         |
+echo  +==================================================+
 echo.
 
-:: Detectar Python portable
-set PYTHON=%~dp0..\python\python.exe
+:: Detectar Python portable (carpeta "python" hermana de "web")
+set PYTHON=%~dp0..\..\python\python.exe
+if not exist "%PYTHON%" set PYTHON=%~dp0..\python\python.exe
+if not exist "%PYTHON%" set PYTHON=%USERPROFILE%\Desktop\SISDAH\python\python.exe
+if not exist "%PYTHON%" set PYTHON=C:\Users\54421076V\Desktop\SISDAH\python\python.exe
 if not exist "%PYTHON%" (
-    echo [ERROR] No se encontró Python en ..\python\python.exe
-    echo         Asegúrate de ejecutar este script desde la carpeta web\
+    echo [ERROR] No se encontro Python portable.
+    echo         La carpeta "python" debe estar junto a la carpeta "web".
     pause & exit /b 1
 )
 echo [OK] Python encontrado: %PYTHON%
 
-:: Instalar dependencias
+:: Instalar dependencias (si existe C:\whl se instala sin internet)
 echo.
 echo [*] Instalando dependencias Python...
-"%PYTHON%" -m pip install -r "%~dp0..\requirements.txt" --quiet
+set PIPOPTS=
+if exist "C:\whl\" set PIPOPTS=--no-index --find-links C:\whl
+"%PYTHON%" -m pip install -r "%~dp0..\requirements.txt" %PIPOPTS% --quiet
 if errorlevel 1 (
-    echo [ERROR] Falló la instalación de dependencias.
+    if exist "C:\whl\" (
+        echo [AVISO] Faltan paquetes en C:\whl -- reintentando contra PyPI...
+        "%PYTHON%" -m pip install -r "%~dp0..\requirements.txt" --quiet
+    )
+)
+if errorlevel 1 (
+    echo [ERROR] Fallo la instalacion de dependencias.
+    echo         Si la red bloquea PyPI: descarga los .whl que falten
+    echo         desde el navegador y dejalos en C:\whl\
     pause & exit /b 1
 )
 echo [OK] Dependencias instaladas.
@@ -31,10 +44,10 @@ echo [OK] Dependencias instaladas.
 :: Crear .env si no existe
 if not exist "%~dp0.env" (
     echo [*] Creando archivo .env...
-    :: Generar SECRET_KEY criptográficamente segura con Python
+    :: Generar SECRET_KEY criptograficamente segura con Python
     for /f %%K in ('"%PYTHON%" -c "import secrets; print(secrets.token_hex(32))"') do set SK=%%K
     (
-        echo # ══ SISDAH — Configuración de entorno ══════════════
+        echo # == SISDAH -- Configuracion de entorno ==============
         echo # IMPORTANTE: Este fichero NUNCA debe subirse a Git
         echo.
         echo # Seguridad
@@ -73,11 +86,11 @@ if errorlevel 1 (
 )
 
 echo.
-echo  ══════════════════════════════════════════════════
-echo  [OK] Instalación completada.
+echo  ==================================================
+echo  [OK] Instalacion completada.
 echo.
 echo  Para iniciar el servidor ejecuta: INICIAR_SERVIDOR.bat
 echo  Para instalar como servicio:      INSTALAR_SERVICIO.bat  (recomendado)
-echo  ══════════════════════════════════════════════════
+echo  ==================================================
 echo.
 pause
