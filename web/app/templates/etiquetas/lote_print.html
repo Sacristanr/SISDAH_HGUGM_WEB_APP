@@ -16,7 +16,7 @@
   }
   .toolbar h1    { font-size: 1rem; font-weight: bold; }
   .toolbar .info { font-size: .85rem; opacity: .85; flex-grow: 1; }
-  .toolbar .tip  { font-size: .75rem; opacity: .7; max-width: 340px; line-height: 1.3; }
+  .toolbar .tip  { font-size: .72rem; opacity: .75; max-width: 420px; line-height: 1.35; }
   .toolbar button {
     background: white; color: #C8102E; border: none;
     padding: 8px 22px; border-radius: 4px; font-weight: bold;
@@ -26,7 +26,7 @@
   .toolbar a { color: white; text-decoration: none; font-size: .82rem; opacity: .8; }
 
   .lista-etiquetas {
-    margin-top: 70px;
+    margin-top: 84px;
     padding: 16px;
     display: flex;
     flex-direction: column;
@@ -34,7 +34,6 @@
     align-items: flex-start;
   }
 
-  /* Cada tarjeta de vista previa */
   .etiqueta-wrap {
     background: white;
     border: 1px solid #ccc;
@@ -45,10 +44,12 @@
     align-items: flex-start;
     box-shadow: 0 1px 4px rgba(0,0,0,.1);
   }
+  .etiqueta-wrap .par { display: flex; gap: 8px; }
   .etiqueta-wrap img {
-    height: 80px;   /* previsualización pantalla */
+    height: 80px;
     width: auto;
     display: block;
+    border: 1px dashed #eee;
   }
   .meta {
     margin-top: 3px;
@@ -57,53 +58,53 @@
     color: #888;
   }
   .meta .tem  { color: #C8102E; font-weight: bold; }
-  .num-orden  {
-    font-size: .65rem; color: #aaa;
-    margin-bottom: 2px;
-  }
+  .num-orden  { font-size: .65rem; color: #aaa; margin-bottom: 2px; }
 
   /* ── ESTILOS DE IMPRESIÓN ──────────────────────────────────
-     Cada etiqueta = una página = una pegatina física
-     Epson LM-90 cinta 36mm: ancho físico 36mm, largo ~90mm
-     En CSS: @page size = largo x ancho (landscape del rollo)
+     Impresora: Epson TM-L90
+     Papel troquelado: 1inch Label 60 × 25.4 mm
+     Área imprimible: 55.6 × 25.4 mm
+     Cada página = una pegatina física. Cada código son DOS
+     pegatinas consecutivas: 1ª Code128, 2ª QR.
+
+     IMPORTANTE en el diálogo de impresión del navegador:
+       - Papel: 60 × 25.4 mm (el "1inch Label" del driver)
+       - Márgenes: Ninguno
+       - Escala: 100 % (NUNCA "Ajustar a página")
+     Y en el driver Epson: Layout → Rotate → Rotate by 90 Degrees
   ────────────────────────────────────────────────────────── */
   @media print {
-
-    /* Tamaño de "página" = tamaño exacto de la pegatina en la cinta */
     @page {
-      size: 90mm 36mm;   /* largo × ancho de la cinta */
-      margin: 0mm;
+      size: 60mm 25.4mm;
+      margin: 0;
     }
 
-    /* Ocultar todo lo que no sea etiqueta */
-    .toolbar, .lista-etiquetas, .meta, .num-orden, body > * {
-      display: none !important;
-    }
+    body { background: white; }
+    .toolbar, .lista-etiquetas { display: none !important; }
 
-    /* Mostrar solo el contenedor de impresión */
     #print-container { display: block !important; }
 
     #print-container .etiqueta-pagina {
-      width:  90mm;
-      height: 36mm;
+      width:  60mm;
+      height: 25.4mm;
       page-break-after: always;
       break-after: page;
+      overflow: hidden;
+      background: white;
       display: flex;
       align-items: center;
       justify-content: center;
-      overflow: hidden;
-      background: white;
     }
 
-    /* La imagen llena exactamente la pegatina */
+    /* La imagen a su tamaño FÍSICO exacto: 55.6 × 25.4 mm.
+       Nada de object-fit ni estiramientos: si el papel del driver
+       coincide, sale a escala 1:1 y los códigos se leen. */
     #print-container .etiqueta-pagina img {
-      width:  90mm;
-      height: 36mm;
-      object-fit: fill;
+      width:  55.6mm;
+      height: 25.4mm;
       display: block;
     }
 
-    /* Evitar margen extra en la última etiqueta */
     #print-container .etiqueta-pagina:last-child {
       page-break-after: avoid;
       break-after: avoid;
@@ -116,10 +117,13 @@
 <!-- ── Barra de herramientas (solo en pantalla) ── -->
 <div class="toolbar">
   <h1>SISDAH — Etiquetas TEM</h1>
-  <span class="info">{{ lote|length }} etiqueta{{ 's' if lote|length != 1 else '' }} listas</span>
+  <span class="info">{{ lote|length }} código{{ 's' if lote|length != 1 else '' }} ·
+    {{ lote|length * 2 }} pegatinas (Code128 + QR por código)</span>
   <span class="tip">
-    Antes de imprimir: en el diálogo del navegador selecciona
-    <strong>tamaño de papel 90×36mm</strong> y <strong>sin márgenes</strong>.
+    En el diálogo de imprimir: papel <strong>60×25.4mm (1inch Label)</strong>,
+    márgenes <strong>Ninguno</strong>, escala <strong>100%</strong>
+    (nunca "ajustar a página").
+    En el driver Epson: Layout → Rotate → <strong>90 Degrees</strong>.
   </span>
   <button onclick="window.print()">🖨️ Imprimir todas</button>
   <a href="/etiquetas/panel">← Volver</a>
@@ -130,14 +134,20 @@
   {% for item in lote %}
   <div class="etiqueta-wrap">
     <div class="num-orden">#{{ loop.index }} de {{ lote|length }}</div>
-    {% if item.imagen_b64 %}
-    <img src="data:image/png;base64,{{ item.imagen_b64 }}" alt="{{ item.tem }}">
-    {% else %}
-    <div style="width:240px;height:80px;border:1px dashed #ccc;display:flex;align-items:center;
-                justify-content:center;font-family:monospace;color:#999;font-size:.8rem">
-      {{ item.tem }}
+    <div class="par">
+      {% if item.imagen_b64 %}
+      <img src="data:image/png;base64,{{ item.imagen_b64 }}" alt="{{ item.tem }} barcode">
+      {% endif %}
+      {% if item.qr_b64 %}
+      <img src="data:image/png;base64,{{ item.qr_b64 }}" alt="{{ item.tem }} QR">
+      {% endif %}
+      {% if not item.imagen_b64 and not item.qr_b64 %}
+      <div style="width:240px;height:80px;border:1px dashed #ccc;display:flex;align-items:center;
+                  justify-content:center;font-family:monospace;color:#999;font-size:.8rem">
+        {{ item.tem }}
+      </div>
+      {% endif %}
     </div>
-    {% endif %}
     <div class="meta">
       <span class="tem">{{ item.tem }}</span>
       {% if item.sn %} · S/N: {{ item.sn }}{% endif %}
@@ -146,14 +156,19 @@
   {% endfor %}
 </div>
 
-<!-- ── Contenedor oculto para impresión (una imagen por página) ── -->
+<!-- ── Contenedor oculto para impresión: 2 páginas por código ── -->
 <div id="print-container" style="display:none">
   {% for item in lote %}
+  {% if item.imagen_b64 %}
   <div class="etiqueta-pagina">
-    {% if item.imagen_b64 %}
     <img src="data:image/png;base64,{{ item.imagen_b64 }}" alt="{{ item.tem }}">
-    {% endif %}
   </div>
+  {% endif %}
+  {% if item.qr_b64 %}
+  <div class="etiqueta-pagina">
+    <img src="data:image/png;base64,{{ item.qr_b64 }}" alt="{{ item.tem }} QR">
+  </div>
+  {% endif %}
   {% endfor %}
 </div>
 
@@ -165,7 +180,6 @@
 {% endif %}
 
 <script>
-// Auto-imprimir si viene con ?print=1
 if (new URLSearchParams(window.location.search).get('print') === '1') {
   window.addEventListener('load', () => setTimeout(() => window.print(), 600));
 }

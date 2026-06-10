@@ -52,147 +52,162 @@ def generar_tem_unico():
     raise ValueError("No se pudo generar un TEM único")
 
 
-# ─── Generación de etiqueta para Epson LM-90 ─────────────────────────────────
-# LM-90: cinta hasta 36mm ancho, impresión térmica, 180dpi
-# Formato: horizontal, blanco/negro puro, sin rellenos de color
+# ─── Generación de etiquetas para Epson TM-L90 ───────────────────────────────
+# Papel: "1inch Label" troquelado 60 × 25.4 mm
+# Área imprimible real: 55.6 × 25.4 mm (el driver no llega a los bordes)
+# Resolución nativa de la impresora: 180 dpi → generamos a 360 dpi (2x)
+# para nitidez y que el navegador escale limpio.
 #
-# Layout a 180dpi:
-#   36mm × 90mm  →  255px × 638px  (vertical)
-#   24mm × 88mm  →  170px × 622px  (cinta 24mm)
-#
-# Usamos 300dpi para mayor nitidez al escalar para pantalla:
-#   36mm × 90mm  →  425px × 1063px
-#
-# Orientación: LANDSCAPE (girado 90°) para que el código de barras
-# sea lo más largo posible en la dirección de la cinta.
+# Cada código produce DOS etiquetas consecutivas:
+#   1ª) solo Code128 grande (máxima legibilidad para el lector láser/CCD)
+#   2ª) solo QR + datos (para escanear con el móvil)
+# Meter ambos códigos en 55×25mm los hace demasiado pequeños y no se leen.
 
-def generar_etiqueta_png(icm: str, marca: str = "", modelo: str = "",
-                          sn: str = "", seccion: str = "",
-                          ancho_mm: int = 36) -> BytesIO:
-    """
-    Etiqueta optimizada para Epson LM-90.
-    Blanco/negro puro, sin color (la cinta solo imprime en negro).
-    Formato horizontal (landscape) para aprovechar la longitud de la cinta.
-    """
+LABEL_W_MM = 55.6    # área imprimible
+LABEL_H_MM = 25.4
+LABEL_DPI  = 360
+
+def _label_canvas():
+    W = int(LABEL_W_MM / 25.4 * LABEL_DPI)   # ≈ 788 px
+    H = int(LABEL_H_MM / 25.4 * LABEL_DPI)   # ≈ 360 px
+    img  = Image.new("RGB", (W, H), (255, 255, 255))
+    return img, ImageDraw.Draw(img), W, H
+
+def _font(size):
+    for nombre in ("arialbd.ttf", "arial.ttf", "Arial.ttf",
+                   "C:/Windows/Fonts/arialbd.ttf",
+                   "C:/Windows/Fonts/arial.ttf",
+                   "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                   "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"):
+        try:
+            return ImageFont.truetype(nombre, size)
+        except Exception:
+            pass
+    return ImageFont.load_default()
+
+def _save_png(img):
+    buf = BytesIO()
+    img.save(buf, format="PNG", dpi=(LABEL_DPI, LABEL_DPI))
+    buf.seek(0)
+    return buf
+
+
+def generar_etiqueta_code128_png(icm: str, marca: str = "", modelo: str = "") -> BytesIO:
+    """Etiqueta 1: SOLO Code128 a lo ancho + número debajo."""
     if not LABELS_OK:
         raise ImportError("Librerías de etiquetas no disponibles")
 
-    DPI    = 300
-    # Dimensiones reales a 300dpi
-    # 36mm ancho × ~88mm largo  →  425 × 1040px
-    # En landscape: H = ancho de cinta, W = longitud
-    H = int(ancho_mm / 25.4 * DPI)   # altura = ancho de cinta (36mm)
-    W = int(88      / 25.4 * DPI)    # longitud 88mm
+    img, draw, W, H = _label_canvas()
+    NEGRO = (0, 0, 0)
+    PAD   = int(LABEL_DPI * 0.04)            # ~1mm de margen
 
-    NEGRO  = (0, 0, 0)
-    BLANCO = (255, 255, 255)
-    GRIS   = (180, 180, 180)
+    f_num  = _font(int(H * 0.17))
+    f_tiny = _font(int(H * 0.11))
 
-    img  = Image.new("RGB", (W, H), BLANCO)
-    draw = ImageDraw.Draw(img)
-
-    # Fuentes — busca Arial, cae a default si no está
-    def font(size):
-        for nombre in ("arial.ttf", "Arial.ttf",
-                       "C:/Windows/Fonts/arial.ttf",
-                       "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"):
-            try:
-                return ImageFont.truetype(nombre, size)
-            except Exception:
-                pass
-        return ImageFont.load_default()
-
-    f_icm    = font(int(H * 0.18))   # ICM grande
-    f_normal = font(int(H * 0.12))
-    f_small  = font(int(H * 0.09))
-    f_tiny   = font(int(H * 0.07))
-
-    PAD = 4  # margen exterior
-
-    # ── QR pequeño en esquina derecha ─────────────────────────────────────────
-    # QR ocupa ~28% del ancho total — suficiente para leerlo con móvil
-    qr_size = int(H * 0.80)
-    qr_x    = W - qr_size - PAD
-    qr_y    = (H - qr_size) // 2
-
-    # El QR enlaza directamente a la ficha del equipo en la web. La ruta
-    # /inventario/<icm> exige sesión iniciada (@login_required): si quien
-    # escanea no está autenticado, Flask-Login le redirige al login y, tras
-    # identificarse, vuelve automáticamente a esta misma ficha (?next=...).
-    try:
-        qr_data = url_for("inventario.detalle", icm=icm, _external=True)
-    except Exception:
-        # Sin contexto de petición (p.ej. generación en lote fuera de request):
-        # fallback al bloque de datos JSON anterior.
-        qr_data = json.dumps({
-            "icm": icm, "marca": marca, "modelo": modelo,
-            "sn": sn, "s": "SISDAH"
-        }, ensure_ascii=False, separators=(',', ':'))
-    qr = qrcode.QRCode(version=2, box_size=3, border=1,
-                       error_correction=qrcode.constants.ERROR_CORRECT_M)
-    qr.add_data(qr_data)
-    qr.make(fit=True)
-    qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
-    qr_img = qr_img.resize((qr_size, qr_size), Image.LANCZOS)
-    img.paste(qr_img, (qr_x, qr_y))
-
-    # Separador fino antes del QR
-    draw.line([(qr_x - 5, PAD), (qr_x - 5, H - PAD)], fill=GRIS, width=1)
-
-    # ── Zona del Code128 ──────────────────────────────────────────────────────
-    # El barcode ocupa ~75% del ancho y ~75% del alto → máxima escaneabilidad
-    bar_zona_w = qr_x - 12         # ancho disponible para barcode + texto
-    bar_h      = int(H * 0.72)     # alto del barcode (deja margen para texto)
-    bar_y      = PAD + 2
-
+    # Barcode ocupa todo el ancho y ~65% del alto
+    bar_w = W - 2 * PAD
+    bar_h = int(H * 0.62)
     try:
         CODE    = barcode.get_barcode_class("code128")
         buf_bar = BytesIO()
         opts = {
-            "module_width":  0.20,
-            "module_height": bar_h / DPI * 25.4 * 0.90,
-            "font_size":     0,        # SIN número bajo el barcode
-            "text_distance": 1.0,
+            "module_width":  0.25,           # se reescala después; >0.2 evita barras de 1px
+            "module_height": 12,
             "background":    "white",
             "foreground":    "black",
-            "write_text":    False,    # El número lo ponemos nosotros más pequeño
-            "quiet_zone":    2.5,
+            "write_text":    False,
+            "quiet_zone":    1.0,            # quiet zone la damos nosotros con PAD
+            "font_size":     0,
         }
         CODE(icm, writer=ImageWriter()).write(buf_bar, opts)
         buf_bar.seek(0)
-        bar_src = Image.open(buf_bar).convert("RGB")
-        bar_src = bar_src.resize((bar_zona_w, bar_h), Image.LANCZOS)
-        img.paste(bar_src, (PAD, bar_y))
+        bar_src = Image.open(buf_bar).convert("L")
+        # Recortar bordes blancos del generador para controlar el tamaño exacto
+        bbox = Image.eval(bar_src, lambda p: 0 if p > 128 else 255).getbbox()
+        if bbox:
+            bar_src = bar_src.crop(bbox)
+        # NEAREST mantiene las barras a ancho entero de píxel (sin grises de
+        # antialiasing que confunden al lector)
+        bar_src = bar_src.resize((bar_w, bar_h), Image.NEAREST).convert("RGB")
+        img.paste(bar_src, (PAD, PAD))
     except Exception:
-        draw.text((PAD + 4, bar_y + 4), icm, font=f_normal, fill=NEGRO)
+        draw.text((PAD, PAD), icm, font=f_num, fill=NEGRO)
 
-    # ── Texto debajo del barcode — todo pequeño ───────────────────────────────
-    ty = bar_y + bar_h + 3
+    # Número centrado debajo, grande
+    ty = PAD + bar_h + int(H * 0.03)
+    tw = draw.textlength(icm, font=f_num)
+    draw.text(((W - tw) // 2, ty), icm, font=f_num, fill=NEGRO)
 
-    # ICM — fuente mediana (no gigante)
-    draw.text((PAD + 2, ty), icm, font=f_normal, fill=NEGRO)
-    ty += f_normal.size + 1
+    # Marca/modelo en pequeño abajo si cabe
+    extra = f"{marca} {modelo}".strip()
+    if extra:
+        ty2 = ty + f_num.size + 2
+        if ty2 + f_tiny.size <= H - 2:
+            tw2 = draw.textlength(extra[:40], font=f_tiny)
+            draw.text(((W - tw2) // 2, ty2), extra[:40], font=f_tiny, fill=(70, 70, 70))
 
-    # Marca / Modelo en una línea compacta
-    if marca or modelo:
-        draw.text((PAD + 2, ty), f"{marca} {modelo}".strip(), font=f_small, fill=(50, 50, 50))
-        ty += f_small.size + 1
+    return _save_png(img)
 
-    # S/N muy pequeño si hay espacio
-    if sn and ty + f_tiny.size < H - 2:
-        draw.text((PAD + 2, ty), f"SN:{sn}", font=f_tiny, fill=(100, 100, 100))
 
-    # Pie derecho
+def generar_etiqueta_qr_png(icm: str, marca: str = "", modelo: str = "",
+                            sn: str = "") -> BytesIO:
+    """Etiqueta 2: QR grande a la izquierda + datos a la derecha."""
+    if not LABELS_OK:
+        raise ImportError("Librerías de etiquetas no disponibles")
+
+    img, draw, W, H = _label_canvas()
+    NEGRO = (0, 0, 0)
+    PAD   = int(LABEL_DPI * 0.04)
+
+    # El QR enlaza a la ficha del equipo; sin contexto de petición cae a JSON
+    try:
+        qr_data = url_for("inventario.detalle", icm=icm, _external=True)
+    except Exception:
+        qr_data = json.dumps({"icm": icm, "sn": sn, "s": "SISDAH"},
+                             ensure_ascii=False, separators=(',', ':'))
+
+    qr = qrcode.QRCode(box_size=10, border=1,
+                       error_correction=qrcode.constants.ERROR_CORRECT_M)
+    qr.add_data(qr_data)
+    qr.make(fit=True)
+    qr_img  = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+    qr_size = H - 2 * PAD                    # QR cuadrado a toda la altura
+    # NEAREST: módulos del QR a píxel entero, sin antialiasing
+    qr_img  = qr_img.resize((qr_size, qr_size), Image.NEAREST)
+    img.paste(qr_img, (PAD, PAD))
+
+    # Datos a la derecha del QR
+    tx = PAD + qr_size + int(W * 0.03)
+    f_icm   = _font(int(H * 0.16))
+    f_small = _font(int(H * 0.11))
+    f_tiny  = _font(int(H * 0.09))
+
+    ty = PAD + 2
+    draw.text((tx, ty), icm, font=f_icm, fill=NEGRO)
+    ty += f_icm.size + 6
+    if marca:
+        draw.text((tx, ty), marca[:22], font=f_small, fill=(40, 40, 40))
+        ty += f_small.size + 3
+    if modelo:
+        draw.text((tx, ty), modelo[:24], font=f_small, fill=(40, 40, 40))
+        ty += f_small.size + 3
+    if sn:
+        draw.text((tx, ty), f"SN: {sn}"[:26], font=f_tiny, fill=(80, 80, 80))
+        ty += f_tiny.size + 3
+
     fecha = datetime.now().strftime("%d/%m/%Y")
-    draw.text((PAD + 2, H - f_tiny.size - 2), f"HGUGM·{fecha}", font=f_tiny, fill=GRIS)
+    draw.text((tx, H - f_tiny.size - PAD), f"HGUGM · {fecha}", font=f_tiny,
+              fill=(130, 130, 130))
 
-    # Borde exterior
-    draw.rectangle([0, 0, W-1, H-1], outline=NEGRO, width=1)
+    return _save_png(img)
 
-    buf = BytesIO()
-    img.save(buf, format="PNG", dpi=(DPI, DPI))
-    buf.seek(0)
-    return buf
+
+def generar_etiqueta_png(icm: str, marca: str = "", modelo: str = "",
+                          sn: str = "", seccion: str = "",
+                          ancho_mm: int = 36) -> BytesIO:
+    """Compatibilidad: la etiqueta 'principal' ahora es la de Code128.
+    ancho_mm se ignora (el papel es fijo: 60×25.4mm troquelado)."""
+    return generar_etiqueta_code128_png(icm, marca, modelo)
 
 
 # ─── Rutas Flask ──────────────────────────────────────────────────────────────
@@ -222,7 +237,10 @@ def generar():
         return jsonify({"error": "Librerias de etiquetas no instaladas"}), 500
 
     try:
-        buf = generar_etiqueta_png(icm, marca, modelo, sn, seccion, ancho_mm=ancho)
+        if request.args.get("tipo") == "qr":
+            buf = generar_etiqueta_qr_png(icm, marca, modelo, sn)
+        else:
+            buf = generar_etiqueta_code128_png(icm, marca, modelo)
         return send_file(buf, mimetype="image/png",
                          download_name=f"etiqueta_{icm}.png",
                          as_attachment=False)
@@ -320,14 +338,16 @@ def imprimir_lote():
     lote = []
     for item in lote_min:
         entry = {"tem": item["tem"], "sn": item.get("sn",""),
-                 "imagen_b64": None}
+                 "imagen_b64": None, "qr_b64": None}
         if LABELS_OK:
             try:
-                buf = generar_etiqueta_png(
-                    item["tem"], item.get("marca",""), item.get("modelo",""),
-                    item.get("sn",""), seccion="", ancho_mm=ancho
-                )
+                buf = generar_etiqueta_code128_png(
+                    item["tem"], item.get("marca",""), item.get("modelo",""))
                 entry["imagen_b64"] = base64.b64encode(buf.getvalue()).decode()
+                buf2 = generar_etiqueta_qr_png(
+                    item["tem"], item.get("marca",""), item.get("modelo",""),
+                    item.get("sn",""))
+                entry["qr_b64"] = base64.b64encode(buf2.getvalue()).decode()
             except Exception:
                 pass
         lote.append(entry)
