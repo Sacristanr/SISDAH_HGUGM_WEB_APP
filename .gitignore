@@ -64,3 +64,4 @@ web/static/SaludMadrid.png
 # Scripts de migracion puntuales
 web/migrar_*.py
 PAQUETE_SISDAH/
+BACKUPS/
