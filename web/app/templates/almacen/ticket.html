@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Trabajos por ticket{% endblock %}
+
+{% block content %}
+<div class="page-header mb-3">
+  <div>
+    <h4 class="page-title mb-0"><i class="bi bi-ticket-detailed me-2"></i>Trabajos por ticket</h4>
+    <small class="text-muted">Todo lo que se movió con un ticket: equipos, teléfonos y APs</small>
+  </div>
+</div>
+
+<div class="card mb-3" style="max-width:560px">
+  <div class="card-body">
+    <form onsubmit="event.preventDefault(); irTicket();">
+      <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="text" id="busca-ticket" class="form-control text-uppercase"
+               placeholder="Nº de ticket (INC123456, REQ987…)" autocomplete="off"
+               value="{{ resultado.codigo if resultado else '' }}"
+               oninput="this.value=this.value.toUpperCase()">
+        <button class="btn btn-primary" type="submit">Buscar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if resultado %}
+  {% set total = resultado.equipos|length + resultado.movimientos_red|length %}
+
+  <div class="mb-3">
+    <h5 class="mb-0">Ticket <span class="text-primary fw-bold">{{ resultado.codigo }}</span></h5>
+    <small class="text-muted">{{ resultado.equipos|length }} equipo(s) ·
+      {{ resultado.movimientos_red|length }} dispositivo(s) de red ·
+      {{ resultado.movimientos|length }} apunte(s) de historial</small>
+  </div>
+
+  {% if resultado.equipos %}
+  <div class="card mb-3">
+    <div class="card-header fw-semibold"><i class="bi bi-pc-display me-1"></i>Equipos</div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead><tr>
+          <th>ICM</th><th>Marca / Modelo</th><th>Sección</th>
+          <th>Estado</th><th>Receptor</th><th>Fecha</th><th>Ubicación</th>
+        </tr></thead>
+        <tbody>
+        {% for e in resultado.equipos %}
+          <tr>
+            <td><a href="/inventario/{{ e.icm }}" class="fw-semibold">{{ e.icm }}</a></td>
+            <td>{{ e.marca }} {{ e.modelo }}</td>
+            <td>{{ e.seccion or '—' }}</td>
+            <td><span class="badge bg-{{ 'warning' if e.estado == 'retirado' else 'secondary' }}">{{ e.estado }}</span></td>
+            <td>{{ e.retirado_por or '—' }}</td>
+            <td>{{ e.fecha_retiro or '—' }}</td>
+            <td>{{ e.ubicacion or '—' }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if resultado.movimientos_red %}
+  <div class="card mb-3">
+    <div class="card-header fw-semibold"><i class="bi bi-telephone me-1"></i>Teléfonos / AP WiFi</div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead><tr>
+          <th>Tipo</th><th>NS</th><th>MAC</th><th>Acción</th>
+          <th>Ubicación</th><th>Técnico</th><th>Fecha</th>
+        </tr></thead>
+        <tbody>
+        {% for m in resultado.movimientos_red %}
+          <tr>
+            <td>{{ 'Teléfono' if m.tipo_equipo == 'telefono' else 'AP WiFi' }}</td>
+            <td>{{ m.ns or '—' }}</td>
+            <td>{{ m.mac or '—' }}</td>
+            <td>{{ m.accion }}</td>
+            <td>{{ m.ubicacion_salida or '—' }}</td>
+            <td>{{ m.tecnico_dni or '—' }}</td>
+            <td>{{ m.fecha.strftime('%d/%m/%Y %H:%M') if m.fecha else '—' }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if resultado.movimientos %}
+  <div class="card mb-3">
+    <div class="card-header fw-semibold"><i class="bi bi-clock-history me-1"></i>Historial</div>
+    <ul class="list-group list-group-flush">
+      {% for m in resultado.movimientos %}
+      <li class="list-group-item small">
+        <span class="text-muted">{{ m.fecha.strftime('%d/%m/%Y %H:%M') if m.fecha else '' }}</span>
+        · <strong>{{ m.icm }}</strong>
+        <span class="badge bg-light text-dark">{{ m.tipo }}</span>
+        — {{ m.descripcion }}
+        {% if m.usuario_dni %}<span class="text-muted">({{ m.usuario_dni }})</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if total == 0 and not resultado.movimientos %}
+  <div class="alert alert-secondary">No se encontró nada con el ticket <strong>{{ resultado.codigo }}</strong>.</div>
+  {% endif %}
+{% endif %}
+
+<script>
+function irTicket() {
+  const t = document.getElementById('busca-ticket').value.trim().toUpperCase();
+  if (t) window.location.href = '/almacen/ticket/' + encodeURIComponent(t);
+}
+document.getElementById('busca-ticket').focus();
+</script>
+{% endblock %}

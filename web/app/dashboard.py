@@ -30,10 +30,18 @@ def home():
         "usuarios":  Usuario.query.filter_by(activo=True).count(),
     }
 
+    # Alertas de stock bajo (umbral configurable en /almacen/stock)
+    try:
+        from .almacen import alertas_stock
+        alertas = alertas_stock()
+    except Exception:
+        alertas = []
+
     if current_user.es_dev:
         return _home_dev(stats)
 
-    return render_template("dashboard/home.html", stats=stats)
+    return render_template("dashboard/home.html", stats=stats,
+                           alertas_stock=alertas)
 
 
 def _home_dev(stats):

@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}Sustitución{% endblock %}
+
+{% block content %}
+<div class="page-header mb-3">
+  <div>
+    <h4 class="page-title mb-0"><i class="bi bi-arrow-left-right me-2"></i>Sustitución de equipo</h4>
+    <small class="text-muted">Retira el averiado y entrega el nuevo en una sola operación</small>
+  </div>
+</div>
+
+<div class="row g-3" style="max-width:760px">
+
+  <!-- Paso 1: equipo averiado -->
+  <div class="col-12">
+    <div class="card" id="card-averiado">
+      <div class="card-body">
+        <h6 class="fw-bold text-danger mb-2">
+          <i class="bi bi-1-circle-fill me-1"></i>Equipo averiado que recoges
+          <span class="text-muted fw-normal small">(opcional pero recomendado)</span>
+        </h6>
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-upc-scan"></i></span>
+          <input type="text" id="icm-averiado" class="form-control text-uppercase"
+                 placeholder="Escanea o escribe el ICM averiado" autocomplete="off"
+                 oninput="this.value=this.value.toUpperCase()" onchange="susBuscar('averiado')">
+          <button class="btn btn-outline-secondary" type="button" onclick="susFoto('averiado')">
+            <i class="bi bi-camera"></i>
+          </button>
+        </div>
+        <div id="info-averiado" class="small mt-2 text-muted"></div>
+        <input type="text" id="sintoma" class="form-control form-control-sm mt-2"
+               placeholder="Síntoma / motivo de la avería (opcional)">
+      </div>
+    </div>
+  </div>
+
+  <!-- Paso 2: equipo que entregas -->
+  <div class="col-12">
+    <div class="card" id="card-entregado">
+      <div class="card-body">
+        <h6 class="fw-bold text-success mb-2">
+          <i class="bi bi-2-circle-fill me-1"></i>Equipo de stock que entregas
+        </h6>
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-upc-scan"></i></span>
+          <input type="text" id="icm-entregado" class="form-control text-uppercase"
+                 placeholder="Escanea o escribe el ICM de stock" autocomplete="off"
+                 oninput="this.value=this.value.toUpperCase()" onchange="susBuscar('entregado')">
+          <button class="btn btn-outline-secondary" type="button" onclick="susFoto('entregado')">
+            <i class="bi bi-camera"></i>
+          </button>
+        </div>
+        <div id="info-entregado" class="small mt-2 text-muted"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Paso 3: datos del trabajo -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="fw-bold mb-2"><i class="bi bi-3-circle-fill me-1"></i>Datos del trabajo</h6>
+        <div class="row g-2">
+          <div class="col-12 col-md-4">
+            <input type="text" id="ticket" class="form-control text-uppercase"
+                   placeholder="Nº ticket *" autocomplete="off"
+                   oninput="this.value=this.value.toUpperCase()">
+          </div>
+          <div class="col-12 col-md-4">
+            <input type="text" id="dni" class="form-control text-uppercase"
+                   placeholder="DNI receptor" autocomplete="off"
+                   oninput="this.value=this.value.toUpperCase()">
+          </div>
+          <div class="col-12 col-md-4">
+            <input type="text" id="ubicacion" class="form-control"
+                   placeholder="Ubicación (planta, servicio…)">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmar -->
+  <div class="col-12">
+    <button id="btn-confirmar" class="btn btn-primary btn-lg w-100 fw-bold" onclick="susConfirmar()">
+      <i class="bi bi-check2-circle me-2"></i>Confirmar sustitución
+    </button>
+    <div id="resultado" class="mt-3"></div>
+  </div>
+</div>
+
+<!-- input oculto para foto con cámara nativa -->
+<input type="file" id="sus-foto-input" accept="image/*" capture="environment" class="d-none">
+
+<script>
+let _susDestino = null;
+
+function susFoto(destino) {
+  _susDestino = destino;
+  const inp = document.getElementById('sus-foto-input');
+  inp.value = '';
+  inp.click();
+}
+
+document.getElementById('sus-foto-input').addEventListener('change', function () {
+  if (!this.files || !this.files[0] || !_susDestino) return;
+  const destino = _susDestino;
+  const info = document.getElementById('info-' + destino);
+  info.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analizando foto…';
+  const fd = new FormData();
+  fd.append('imagen', this.files[0]);
+  this.value = '';
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/retiradas/api/decode-barcode');
+  xhr.setRequestHeader('X-CSRFToken', document.querySelector('meta[name="csrf-token"]').content);
+  xhr.onload = function () {
+    try {
+      const d = JSON.parse(xhr.responseText);
+      if (d.ok) {
+        document.getElementById('icm-' + destino).value = d.valor;
+        susBuscar(destino);
+      } else {
+        info.textContent = '✗ No detectado — acerca más el código y repite';
+      }
+    } catch (e) { info.textContent = '⚠ Error al procesar respuesta'; }
+  };
+  xhr.onerror = () => { info.textContent = '⚠ Error de conexión'; };
+  xhr.send(fd);
+});
+
+function susBuscar(destino) {
+  const icm  = document.getElementById('icm-' + destino).value.trim().toUpperCase();
+  const info = document.getElementById('info-' + destino);
+  if (!icm) { info.textContent = ''; return; }
+  fetch('/almacen/api/buscar-equipo?icm=' + encodeURIComponent(icm))
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { info.innerHTML = '<span class="text-danger">' + (d.error || 'Error') + '</span>'; return; }
+      if (!d.existe) {
+        if (destino === 'entregado') {
+          info.innerHTML = '<span class="text-danger fw-bold">✗ No está en el inventario — no se puede entregar</span>';
+        } else {
+          info.innerHTML = '<span class="text-warning">⚠ No inventariado — se dará de alta como avería automáticamente</span>';
+        }
+        return;
+      }
+      const e = d.equipo;
+      const ficha = `${e.marca || ''} ${e.modelo || ''} · ${e.seccion || ''} · estado: <strong>${e.estado}</strong>`;
+      if (destino === 'entregado') {
+        info.innerHTML = d.disponible
+          ? '<span class="text-success">✓ ' + ficha + '</span>'
+          : '<span class="text-danger fw-bold">✗ No disponible — ' + ficha + '</span>';
+      } else {
+        info.innerHTML = '✓ ' + ficha;
+      }
+    })
+    .catch(() => { info.textContent = '⚠ Error de conexión'; });
+}
+
+function susConfirmar() {
+  const btn = document.getElementById('btn-confirmar');
+  const res = document.getElementById('resultado');
+  const payload = {
+    icm_averiado:  document.getElementById('icm-averiado').value.trim(),
+    icm_entregado: document.getElementById('icm-entregado').value.trim(),
+    ticket:        document.getElementById('ticket').value.trim(),
+    dni:           document.getElementById('dni').value.trim(),
+    ubicacion:     document.getElementById('ubicacion').value.trim(),
+    sintoma:       document.getElementById('sintoma').value.trim(),
+  };
+  if (!payload.icm_entregado) { res.innerHTML = '<div class="alert alert-danger">Falta el equipo a entregar</div>'; return; }
+  if (!payload.ticket)        { res.innerHTML = '<div class="alert alert-danger">Falta el número de ticket</div>'; return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Registrando…';
+
+  fetch('/almacen/api/sustituir', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+    },
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(d => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check2-circle me-2"></i>Confirmar sustitución';
+    if (!d.ok) { res.innerHTML = '<div class="alert alert-danger">' + d.error + '</div>'; return; }
+    let html = '<div class="alert alert-success"><strong>✓ Sustitución registrada</strong> — ticket ' + d.ticket +
+               '<br>Entregado: ' + d.entregado;
+    if (d.averiado) html += ' · Recogido: ' + d.averiado + (d.averiado_creado ? ' (alta nueva como avería)' : '');
+    html += '</div>';
+    if (d.alertas && d.alertas.length) {
+      html += '<div class="alert alert-warning mb-0"><i class="bi bi-exclamation-triangle me-1"></i><strong>Stock bajo:</strong> ';
+      html += d.alertas.map(a => `${a.seccion} (${a.stock}/${a.minimo})`).join(' · ');
+      html += '</div>';
+    }
+    res.innerHTML = html;
+    // Limpiar para la siguiente
+    ['icm-averiado','icm-entregado','sintoma','dni','ubicacion'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('info-averiado').textContent = '';
+    document.getElementById('info-entregado').textContent = '';
+    document.getElementById('icm-averiado').focus();
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check2-circle me-2"></i>Confirmar sustitución';
+    res.innerHTML = '<div class="alert alert-danger">Error de conexión</div>';
+  });
+}
+
+// Foco inicial para escáner USB (keyboard wedge)
+document.getElementById('icm-averiado').focus();
+</script>
+{% endblock %}

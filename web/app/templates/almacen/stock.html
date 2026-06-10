@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Control de stock{% endblock %}
+
+{% block content %}
+<div class="page-header mb-3">
+  <div>
+    <h4 class="page-title mb-0"><i class="bi bi-box-seam me-2"></i>Control de stock</h4>
+    <small class="text-muted">Disponible por sección y umbrales de alerta</small>
+  </div>
+</div>
+
+<div class="card" style="max-width:720px">
+  <div class="card-body">
+    <table class="table table-sm align-middle mb-2">
+      <thead>
+        <tr>
+          <th>Sección</th>
+          <th class="text-center">En stock</th>
+          <th class="text-center" style="width:130px">Mínimo</th>
+          <th class="text-center">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in filas %}
+        <tr class="{{ 'table-danger' if f.alerta else '' }}">
+          <td class="fw-semibold">{{ f.seccion }}</td>
+          <td class="text-center fs-5 {{ 'text-danger fw-bold' if f.alerta else '' }}">{{ f.stock }}</td>
+          <td class="text-center">
+            {% if es_gestor %}
+            <input type="number" min="0" class="form-control form-control-sm text-center minimo-input"
+                   data-seccion="{{ f.seccion }}" value="{{ f.minimo or '' }}" placeholder="—"
+                   style="width:90px;margin:0 auto">
+            {% else %}
+            {{ f.minimo or '—' }}
+            {% endif %}
+          </td>
+          <td class="text-center">
+            {% if f.alerta %}
+            <span class="badge bg-danger"><i class="bi bi-exclamation-triangle me-1"></i>Reponer</span>
+            {% elif f.minimo %}
+            <span class="badge bg-success">OK</span>
+            {% else %}
+            <span class="badge bg-secondary">Sin umbral</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-center text-muted py-4">No hay equipos en stock</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if es_gestor %}
+    <div class="d-flex align-items-center gap-3">
+      <button class="btn btn-primary" onclick="guardarMinimos()">
+        <i class="bi bi-save me-1"></i>Guardar mínimos
+      </button>
+      <span id="guardar-estado" class="small text-muted"></span>
+    </div>
+    <small class="text-muted d-block mt-2">
+      Deja el mínimo vacío o a 0 para no controlar esa sección.
+      Las secciones por debajo del mínimo aparecen en rojo aquí y en el inicio.
+    </small>
+    {% endif %}
+  </div>
+</div>
+
+{% if es_gestor %}
+<script>
+function guardarMinimos() {
+  const minimos = {};
+  document.querySelectorAll('.minimo-input').forEach(inp => {
+    const v = parseInt(inp.value, 10);
+    if (v > 0) minimos[inp.dataset.seccion] = v;
+  });
+  const estado = document.getElementById('guardar-estado');
+  estado.textContent = 'Guardando…';
+  fetch('/almacen/api/stock-minimos', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+    },
+    body: JSON.stringify({minimos})
+  })
+  .then(r => r.json())
+  .then(d => {
+    estado.textContent = d.ok ? '✓ Guardado' : ('Error: ' + (d.error || ''));
+    if (d.ok) setTimeout(() => location.reload(), 600);
+  })
+  .catch(() => { estado.textContent = '⚠ Error de conexión'; });
+}
+</script>
+{% endif %}
+{% endblock %}

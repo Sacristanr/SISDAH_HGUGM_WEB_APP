@@ -9,6 +9,18 @@
   </div>
 </div>
 
+{% if alertas_stock %}
+<!-- Alertas de stock bajo -->
+<div class="alert alert-danger d-flex align-items-center flex-wrap gap-2 mb-3">
+  <i class="bi bi-exclamation-triangle-fill fs-5 me-1" aria-hidden="true"></i>
+  <strong>Stock bajo:</strong>
+  {% for a in alertas_stock %}
+  <span class="badge bg-danger fs-6">{{ a.seccion }}: {{ a.stock }}/{{ a.minimo }}</span>
+  {% endfor %}
+  <a href="/almacen/stock" class="ms-auto btn btn-sm btn-outline-danger">Ver stock</a>
+</div>
+{% endif %}
+
 <!-- KPIs -->
 <div class="row g-2 mb-4 ek-stagger">
   <div class="col-6 col-md-4 col-xl-2">
@@ -62,6 +74,9 @@
 <p class="section-label section-label--purple"><i class="bi bi-wrench me-1" aria-hidden="true"></i>Herramientas de almacén</p>
 <div class="row g-2 mb-4 ek-stagger">
   {% for icon,title,href,color,desc in [
+    ("bi-arrow-left-right","Sustitución","/almacen/sustitucion","orange","Retirar averiado y entregar en un paso"),
+    ("bi-box-seam","Control stock","/almacen/stock","green","Mínimos y alertas de reposición"),
+    ("bi-ticket-detailed","Por ticket","/almacen/ticket","blue","Todo lo movido con un ticket"),
     ("bi-search","Revisión","/revision/","blue","Auditoría física"),
     ("bi-question-diamond","Desaparecidos","/desaparecidos/","red","Equipos en ubicación desconocida"),
     ("bi-exclamation-triangle","Averías","/inventario/?estado=averia","red","Equipos con incidencia"),
@@ -100,10 +115,10 @@
 </p>
 <div class="row g-3 tec-grid">
   {% for icon, title, route, accent, desc, shortcut in [
-    ("bi-list-ul",        "Inventario",      "inventario.lista", "blue",   "Consultar y buscar equipos",       "Equipos · stock"),
+    ("bi-arrow-left-right","Sustitución",    "almacen.sustitucion","orange","Averiado fuera, nuevo dentro — un paso", "Incidencias · swap"),
     ("bi-box-arrow-right","Retirada",        "retiradas.form",   "orange", "Registrar salida de equipo",       "Salidas · bajas"),
-    ("bi-clock-history",  "Historial",       "historial.lista",  "purple", "Movimientos y registros",          "Auditoría · ICM"),
-    ("bi-card-list",      "Fichas técnicas", "fichas.lista",     "teal",   "Configuraciones por modelo",       "Modelos · specs")
+    ("bi-list-ul",        "Inventario",      "inventario.lista", "blue",   "Consultar y buscar equipos",       "Equipos · stock"),
+    ("bi-clock-history",  "Historial",       "historial.lista",  "purple", "Movimientos y registros",          "Auditoría · ICM")
   ] %}
   <div class="col-6 col-md-6 col-lg-3" style="--tec-i: {{ loop.index0 }}">
     <a href="{{ url_for(route) }}" class="tec-card tec-{{ accent }}"
