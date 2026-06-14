@@ -12,7 +12,9 @@ def _build_uri():
         default_dir = r"E:\SISDAH\data" if os.path.isdir(r"E:\SISDAH\data") else _base
         db_dir  = os.getenv("SQLITE_DIR", default_dir)
         db_path = os.path.join(db_dir, "sisdah.db")
-        return f"sqlite:///{db_path}"
+        # SQLite URI debe usar barras forward, no backslashes (Windows fix)
+        db_path_uri = db_path.replace("\\", "/")
+        return f"sqlite:///{db_path_uri}"
     user = os.getenv("DB_USER", "sisdah_app")   # nunca root en producción
     pwd  = os.getenv("DB_PASSWORD", "")
     host = os.getenv("DB_HOST", "localhost")
